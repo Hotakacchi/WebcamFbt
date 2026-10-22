@@ -36,6 +36,8 @@ dotnet run --project src\WebcamFbt.App -c Release
 - [x] フェーズ2: 腰・両足の位置/回転 → One Euro Filter → OSC 送信（カメラ1台）（ユーザー確認済み・コミット済み）
 - [x] フェーズ3: キャリブレーション（身長、床の高さ、向き、T ポーズでのリセット。BodyProportions を実測値で置き換える）（ユーザー確認済み・コミット済み）
 - [ ] **フェーズ4: カメラ2台のステレオキャリブレーション（チェッカーボード）と三角測量**
+  - 設計は docs/design.md「ステレオ化（フェーズ4）」と下記「設計の要点（フェーズ4）」にまとめ済み（未実装）
+  - サブステップ: 4a 2台同時プレビュー＋各カメラ2D表示 → 4b ステレオ校正＋保存 → 4c 三角測量で3D化・単眼/ステレオ切替 → 4d 床・向き校正のステレオ対応
 - [ ] フェーズ5: 設定の保存、UI の整備、self-contained 単一 exe の配布ビルド
 
 ## 設計の要点（フェーズ2）
@@ -61,6 +63,21 @@ dotnet run --project src\WebcamFbt.App -c Release
 - 適用は `CalibrationData.Apply(TrackerFrame)`。未キャリブレーション時（`CalibrationData.None`）は固定値で従来通り動く
 - キャリブレーションは推論スレッドでフレームを貯め、確定結果はフラグ経由で UI スレッド（`_statsTimer`）が受け取る
 - 設定の永続化はフェーズ5。現状は再起動で消える（メモリ保持のみ）
+
+## 設計の要点（フェーズ4）
+
+詳細は docs/design.md「ステレオ化（フェーズ4）」。要点のみ:
+
+- 2台のカメラで同じ関節を見て三角測量し、真の3D（m）を得る。単眼の弱点（背面・足を後ろ・距離誤差）を解消
+- Core は OpenCV 非依存を維持。チェッカーボード検出・ステレオ校正は Vision 側（OpenCV）、
+  三角測量の数式は検算しやすいよう純C#で Core 側（`StereoTriangulator`）
+- `StereoCalibration`（Core: K1/dist1/K2/dist2/R/t/再投影誤差）。カメラ1が世界原点。
+  再校正は手間なのでファイル保存（`%LOCALAPPDATA%\WebcamFbt`、永続化全般はフェーズ5）
+- `StereoCameraPipeline`: カメラ×2・推定器×2（IFは1スレッド1インスタンス前提）。
+  非同期カメラなのでタイムスタンプが近いペア（dt<~20ms）だけ対応付ける
+- 既存後段（`Pose3D → TrackerSolver → OSC`）は無改修。`MonocularLifter` と `StereoTriangulator` を切替
+- OpenCvSharp の `FindChessboardCornersSB` / `StereoCalibrate` / `UndistortPoints` を活用
+- サブステップ 4a〜4d で止まって確認（上記「進捗」参照）
 
 ## フォルダ構成
 

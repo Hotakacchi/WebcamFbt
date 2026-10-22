@@ -54,3 +54,61 @@
 - 回転行列の列 = (右, 上, 前) とすると
   - x = asin(-前.y)、y = atan2(前.x, 前.z)、z = atan2(右.y, 上.y)
   - |前.y| ≈ 1 のとき z = 0、y = atan2(-右.z, 右.x)
+
+## ステレオ化（フェーズ4）
+
+単眼（フェーズ2/3）の原理的な弱点——背面・足を後ろに引く動き・骨長仮定による距離誤差——を、
+2 台のカメラで同じ関節を見て三角測量し、真の 3D（メートル）を得ることで解消する。校正はチェッカーボードで行う。
+
+### 全体の流れ
+
+```
+[カメラ1] → 2D推定 ┐
+                   ├→ タイムスタンプで対応付け → 三角測量 → Pose3D → TrackerSolver → OSC
+[カメラ2] → 2D推定 ┘                                  （フェーズ2/3の後段はそのまま）
+```
+
+### コンポーネント分担
+
+Core は OpenCV 非依存を保つ。チェッカーボード検出・ステレオ校正は OpenCV を持つ Vision 側、
+三角測量の数式は検算しやすいよう純 C# で Core 側に置く。
+
+- `StereoCalibrator`（Vision / OpenCV）: 両カメラで同時にチェッカーボードを写し、
+  `Cv2.FindChessboardCornersSB` + `CornerSubPix` でコーナー検出。良好なペアを N 組（15〜20）集め、
+  `Cv2.CalibrateCamera`（各カメラの内部パラメータ＋歪み）→ `Cv2.StereoCalibrate` で相対姿勢 R, t を推定。
+  再投影誤差を品質指標として表示。カメラ1を世界原点（基準）とする。
+- `StereoCalibration`（Core）: `K1, dist1, K2, dist2, R, t, ReprojError`。既存 `CameraIntrinsics` を歪み対応に拡張 or 併用。
+  再校正は手間なのでファイル保存（`%LOCALAPPDATA%\WebcamFbt`）。設定全般の永続化はフェーズ5だが、ステレオ校正だけ先行保存。
+- `StereoTriangulator`（Core / 純C#）: 両視点で信頼度の高い関節について、歪み除去 → 射影行列
+  `P1=K1[I|0]`, `P2=K2[R|t]` で DLT 三角測量 → カメラ1座標の 3D 点。
+  片方しか見えない関節は単眼リフト（フェーズ2）にフォールバック or ホールド。
+  得た 3D をトラッキング座標へ（`CameraToTracking` 相当＋フェーズ3の床・向き校正を再利用）。
+- `StereoCameraPipeline`（Vision）: `OpenCvCameraSource` ×2、`IPoseEstimator2D` ×2
+  （IF は 1 スレッド 1 インスタンス前提なので推定器も 2 つ＝RTMPose セッション 2 つぶんの負荷）。
+  2 本の推論スレッド。各 `Pose2D` をタイムスタンプ付きで小さなリングに保持し、
+  最も近い時刻同士（dt < ~20ms）で対応付ける。大きくズレたペアは破棄（ハード同期がないため）。
+- 既存後段（`Pose3D → TrackerSolver → VrcTrackerSender`）は無改修。
+  単眼 `MonocularLifter` とステレオ `StereoTriangulator` を切り替える構造にする。
+
+### UI 追加
+
+- カメラ2の選択（デバイス/解像度/取得方式）
+- モード切替: 1台（単眼）/ 2台（ステレオ）
+- ステレオ校正フロー: 両カメラ映像＋検出コーナー重畳、安定したら自動キャプチャ、
+  カウンタ（例 15/20）、完了で再投影誤差表示・保存
+- チェッカーボード設定: 内側コーナー数（列×行）、マス一辺 [mm]
+
+### 主な課題
+
+- 非同期カメラ: 時刻マッチングで吸収。速い動きでペア誤差が出るので dt 制限
+- 負荷: 推定器2つ＝GPU/VRAM 増。DirectML 制約（EnableMemoryPattern=false / ORT_SEQUENTIAL）は既存どおり
+- 人物対応: 単一人物前提（各カメラで最高スコアの検出を採用）。複数人は対象外
+- OpenCvSharp の `FindChessboardCornersSB` / `StereoCalibrate` / `UndistortPoints` を活用し手実装を最小化
+- ライセンス: OpenCV（Apache-2.0）/ OpenCvSharp / 自作数式のみ。AGPL 不使用——配布制約なし
+
+### サブステップ（各ステップで止まって確認）
+
+- 4a: 2台同時プレビュー＋各カメラの2D推定表示（三角測量なし）
+- 4b: チェッカーボードでステレオ校正（R,t＋再投影誤差）＋保存
+- 4c: 三角測量で3D化 → 既存後段へ。単眼/ステレオ切替
+- 4d: 床・向き校正のステレオ対応と精度確認
