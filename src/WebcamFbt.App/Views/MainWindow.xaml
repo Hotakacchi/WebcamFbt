@@ -158,6 +158,29 @@
                 </Grid>
             </Grid>
 
+            <!-- カメラの校正中の案内（上の中央に重ねて表示。校正中はトラッキングが止まることをはっきり出す） -->
+            <Border Background="#E6182A4A" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="6"
+                    Padding="14,10" Margin="0,14,0,0" MaxWidth="560"
+                    HorizontalAlignment="Center" VerticalAlignment="Top"
+                    Visibility="{Binding IsCameraCalibrating, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="カメラの校正中 — トラッキングは止まっています" Foreground="White" FontWeight="SemiBold" FontSize="14" />
+                        <TextBlock Text="{Binding CameraCalibrationText}" Foreground="#FFE6E6E6" Margin="0,4,0,0"
+                                   FontFamily="Consolas, BIZ UDGothic, Meiryo" />
+                        <TextBlock Text="{Binding CameraCalibrationHint}" Foreground="#FFE6E6E6" TextWrapping="Wrap" Margin="0,4,0,0" />
+                        <TextBlock Text="中止するか 15 枚そろうと、トラッキングに戻ります" Foreground="{StaticResource SubTextBrush}"
+                                   FontSize="11" Margin="0,4,0,0" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Content="中止" Command="{Binding CancelCameraCalibrationCommand}"
+                            VerticalAlignment="Top" Margin="12,0,0,0" Padding="14,4" />
+                </Grid>
+            </Border>
+
             <!-- 上から見たトラッカー（右下に重ねて表示。実行中だけ） -->
             <views:TrackerTopDownView Frame="{Binding TopDownFrame}" Width="170" Height="180"
                                       HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10"
@@ -384,6 +407,10 @@
                         <TextBlock Text="カメラの校正（チェッカーボード）" Style="{StaticResource SectionHeader}" />
                         <TextBlock Text="印刷したチェッカーボードをカメラに向け、位置と傾きを変えながら毎回少し止めます。2台のときは両方に写る位置で。1マスの大きさは定規で測った値を入れてください。"
                                    Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                        <TextBlock Text="校正中はトラッキングが止まります（中止するか 15 枚そろうと戻ります）。先にボードを用意してから「開始」→「校正を開始」を押してください。"
+                                   Foreground="{StaticResource WarnBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0" />
+                        <Button Content="印刷用のボードを保存（今の交点の数で作る）" Command="{Binding SaveCheckerboardImageCommand}"
+                                Height="26" Margin="0,6,0,0" />
                         <Grid IsEnabled="{Binding CanEditBoard}" Margin="0,4,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -408,13 +435,29 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="校正を開始" Command="{Binding StartCameraCalibrationCommand}" Height="30" />
+                            <!-- 「開始」していないとき・校正中は押せない -->
+                            <Button Grid.Column="0" Content="校正を開始" Command="{Binding StartCameraCalibrationCommand}" Height="30">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsCameraCalibrating}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
                             <Button Grid.Column="1" Content="中止" Command="{Binding CancelCameraCalibrationCommand}"
                                     Height="30" Margin="4,0,0,0" Padding="12,0" />
                         </Grid>
                         <TextBlock Text="{Binding CameraCalibrationText}" Foreground="{StaticResource SubTextBrush}"
                                    FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="12"
                                    TextWrapping="Wrap" Margin="0,8,0,0" />
+                        <TextBlock Text="{Binding CameraCalibrationHint}" Foreground="{StaticResource TextBrush}"
+                                   FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0" />
                     </StackPanel>
                 </ScrollViewer>
                 </TabItem>

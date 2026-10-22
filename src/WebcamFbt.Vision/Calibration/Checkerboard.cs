@@ -66,6 +66,51 @@ public static class CheckerboardDetector
 }
 
 /// <summary>
+/// 印刷用のチェッカーボードの画像を作る。マス目は「内側の交点 + 1」個ずつ並べ、周りに白い余白を付ける
+/// （検出にはボードの周りの余白が必要）。印刷の拡大・縮小で大きさが変わるので、1 マスは利用者に定規で測ってもらう。
+/// </summary>
+public static class CheckerboardImage
+{
+    /// <param name="squarePixels">1 マスの大きさ [px]。既定は 300dpi で約 21mm（9×6 なら A4 横に等倍で収まる）。</param>
+    public static Mat Create(int innerCols, int innerRows, int squarePixels = 250)
+    {
+        int cols = innerCols + 1, rows = innerRows + 1;
+        int sq = squarePixels;
+        int margin = sq;               // 周りの白い余白（1 マス分。半マスだと検出できないことがあった）
+        int footer = sq / 2;           // 下の説明書きの分
+        int width = cols * sq + 2 * margin;
+        int height = rows * sq + 2 * margin + footer;
+
+        var image = new Mat(height, width, MatType.CV_8UC1, Scalar.All(255));
+        for (int r = 0; r < rows; r++)
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                if ((r + c) % 2 == 0) Cv2.Rectangle(image, new Rect(margin + c * sq, margin + r * sq, sq, sq), Scalar.All(0), -1);
+            }
+        }
+
+        // 説明書き（OpenCV は日本語を描けないので英語）。幅に収まるよう文字の大きさを決める
+        var text = $"WebcamFbt calibration board: {innerCols} x {innerRows} inner corners. Measure one square with a ruler and enter its size (mm).";
+        const HersheyFonts font = HersheyFonts.HersheySimplex;
+        int thickness = Math.Max(1, sq / 100);
+        var size = Cv2.GetTextSize(text, font, 1.0, thickness, out _);
+        double scale = Math.Min(sq / 60.0, (width - 2.0 * margin) / size.Width);
+        // ボードの下の白い余白（1 マス分）は検出に要るので空けておき、その下の欄に書く
+        Cv2.PutText(image, text, new Point(margin, margin + rows * sq + margin + footer / 2),
+            font, scale, Scalar.All(90), thickness, LineTypes.AntiAlias);
+        return image;
+    }
+
+    /// <summary>画像を PNG で保存する。</summary>
+    public static void Save(string path, int innerCols, int innerRows)
+    {
+        using var image = Create(innerCols, innerRows);
+        if (!Cv2.ImWrite(path, image)) throw new IOException($"画像を保存できませんでした: {path}");
+    }
+}
+
+/// <summary>
 /// 校正用の撮影 1 回分。推論スレッドから各フレームを渡すと、検出してサンプルを貯め、コーナーを画像に描く。
 /// </summary>
 public sealed class CheckerboardCaptureSession

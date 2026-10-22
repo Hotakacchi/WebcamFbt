@@ -25,6 +25,8 @@ public sealed class CheckerboardSampleCollector
         public readonly List<Vector2[]> Samples = new();
         public double LastAcceptTime = double.NegativeInfinity;
         public int Width, Height;
+        public int FramesWithoutBoard; // 最後にボードが見えてから、見えなかったフレームの数（画面の案内用）
+        public bool BoardVisible;      // 直前のフレームでボードが見えたか
     }
 
     private readonly object _lock = new();
@@ -68,12 +70,15 @@ public sealed class CheckerboardSampleCollector
             var c = _cameras[camera];
             c.Width = width;
             c.Height = height;
+            c.BoardVisible = corners is not null;
             if (corners is null)
             {
+                c.FramesWithoutBoard++;
                 c.Last = null;
                 c.LastStill = null;
                 return;
             }
+            c.FramesWithoutBoard = 0;
 
             var detection = new Detection(time, corners);
             bool still = c.Last is not null
@@ -118,6 +123,18 @@ public sealed class CheckerboardSampleCollector
     public int SampleCount(int camera)
     {
         lock (_lock) return _cameras[camera].Samples.Count;
+    }
+
+    /// <summary>直前のフレームでボードが見えたか（画面の案内用）。</summary>
+    public bool IsBoardVisible(int camera)
+    {
+        lock (_lock) return _cameras[camera].BoardVisible;
+    }
+
+    /// <summary>最後にボードが見えてから（一度も見えていなければ始めてから）、見えなかったフレームの数。</summary>
+    public int FramesWithoutBoard(int camera)
+    {
+        lock (_lock) return _cameras[camera].FramesWithoutBoard;
     }
 
     /// <summary>ステレオの組の数。</summary>
