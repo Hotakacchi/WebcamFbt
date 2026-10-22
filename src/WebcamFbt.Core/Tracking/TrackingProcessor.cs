@@ -103,6 +103,13 @@ public sealed class TrackingProcessor
         _calibrationActive = false;
     }
 
+    /// <summary>保存しておいたキャリブレーション結果を適用する（開始前に UI スレッドから）。</summary>
+    public void RestoreCalibration(CalibrationData data)
+    {
+        Calibration = data;
+        Body = data.Body;
+    }
+
     /// <summary>キャリブレーション結果を破棄し、既定の比率に戻す。</summary>
     public void ClearCalibration()
     {

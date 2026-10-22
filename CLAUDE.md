@@ -57,6 +57,11 @@ dotnet run --project src\WebcamFbt.App -c Release
     （`CalibrationData.Tilt`。全フレームがステレオのときだけ。適用順は 傾き→ヨー→床）。最小の回転なので縦軸まわりのねじれが少し残るが、
     ヨー補正が打ち消す。精度の目安 `StereoStats`（三角測量できた点数・再投影誤差・左右の脚の長さ差・左右入替）を左下に表示
 - [ ] **フェーズ5: 設定の保存、UI の整備、self-contained 単一 exe の配布ビルド**
+  - サブステップ: 5a 設定の保存 → 5b UI の整備（内容はユーザーと相談して決める）→ 5c 配布ビルド
+  - [x] 5a: 実装・コミット済み（ユーザー確認済み）。`%LOCALAPPDATA%\WebcamFbt\settings.json`（`Core/Persistence`）。
+    画面の設定＋体のキャリブレーション結果を保存し、起動時に復元。変更の 1 秒後と終了時に保存。
+    OSC の送信先は「反映」に成功したものだけ保存。保存対象を増やすときは `AppSettings`・`PersistedProperties`・
+    `ApplySettings`・`BuildSettings` の 4 か所に足す
 
 ## 設計の要点（フェーズ2）
 
@@ -80,7 +85,7 @@ dotnet run --project src\WebcamFbt.App -c Release
   - 向き: 体ヨーの中央値を正面として記録し、腰を軸にその場で回して +Z 正面にそろえる（位置・回転の両方）
 - 適用は `CalibrationData.Apply(TrackerFrame)`。未キャリブレーション時（`CalibrationData.None`）は固定値で従来通り動く
 - キャリブレーションは推論スレッドでフレームを貯め、確定結果はフラグ経由で UI スレッド（`_statsTimer`）が受け取る
-- 設定の永続化はフェーズ5。現状は再起動で消える（メモリ保持のみ）
+- 結果は設定ファイルに保存し、起動時に復元する（フェーズ5a）
 
 ## 設計の要点（フェーズ4）
 

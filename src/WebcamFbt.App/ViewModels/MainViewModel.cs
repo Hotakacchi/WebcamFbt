@@ -92,6 +92,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _previewTimer.Tick += (_, _) => UpdatePreview();
         _statsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _statsTimer.Tick += (_, _) => UpdateStats();
+
+        InitializeSettings();
     }
 
     partial void OnIsRunningChanged(bool value)
@@ -294,6 +296,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        SaveSettingsNow();
         StopPipeline();
         _estimator?.Dispose();
         _estimator = null;

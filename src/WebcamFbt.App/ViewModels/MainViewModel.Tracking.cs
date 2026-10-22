@@ -74,6 +74,10 @@ public sealed partial class MainViewModel
         {
             _osc.SetEndpoint(OscHost.Trim(), OscPort);
             Status = $"OSC の送信先を {_osc.Endpoint} にしました";
+            // 保存するのは反映できた送信先だけ（次回の起動で自動的に反映するため）
+            _appliedOscHost = OscHost.Trim();
+            _appliedOscPort = OscPort;
+            MarkSettingsDirty();
         }
         catch (Exception ex)
         {
@@ -115,7 +119,9 @@ public sealed partial class MainViewModel
     {
         _tracking?.ClearCalibration();
         IsCalibrating = false;
+        CalibrationText = DescribeBodyCalibration(CalibrationData.None);
         Status = "キャリブレーションを解除しました";
+        MarkSettingsDirty();
     }
 
     /// <summary>フィルタの値を初期値に戻す。</summary>
@@ -260,6 +266,7 @@ public sealed partial class MainViewModel
             Status = success
                 ? "キャリブレーション完了"
                 : "キャリブレーション失敗（体全体が映っていませんでした）";
+            if (success) MarkSettingsDirty();
         }
         if (IsCalibrating && !tracking.IsCalibrating) IsCalibrating = false;
 
@@ -269,12 +276,12 @@ public sealed partial class MainViewModel
             return;
         }
 
-        var cal = tracking.Calibration;
-        if (!cal.IsCalibrated)
-        {
-            CalibrationText = "キャリブレーション: 未実施（既定値で動作）";
-            return;
-        }
+        CalibrationText = DescribeBodyCalibration(tracking.Calibration);
+    }
+
+    private static string DescribeBodyCalibration(CalibrationData cal)
+    {
+        if (!cal.IsCalibrated) return "キャリブレーション: 未実施（既定値で動作）";
 
         var b = cal.Body;
         var sb = new StringBuilder();
@@ -282,6 +289,6 @@ public sealed partial class MainViewModel
         if (cal.HasFloor) sb.AppendLine($"床の高さ {cal.FloorY,5:F2} m   正面補正 {cal.YawOffsetDeg,4:F0}°");
         if (cal.Tilt is not null) sb.AppendLine($"カメラの傾き補正 {cal.TiltDeg,4:F1}°（ステレオで測定。この後カメラの傾きの設定は変えないでください）");
         sb.Append($"比率 肩{b.ShoulderWidth:F2} 腰{b.HipWidth:F2} 胴{b.Torso:F2} 腿{b.Thigh:F2} すね{b.Shin:F2} 足{b.Foot:F2}");
-        CalibrationText = sb.ToString();
+        return sb.ToString();
     }
 }
