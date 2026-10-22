@@ -1,3 +1,4 @@
+// Mac 版（WebcamFbt.Mac）からも同じファイルをコンパイルして共有している。WPF の型（System.Windows.*）を使わないこと。
 using System.Reflection;
 
 namespace WebcamFbt.App;

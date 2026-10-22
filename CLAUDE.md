@@ -83,7 +83,7 @@ UI は**Windows 版とできるだけ同じ見た目にする**（ユーザー�
   `v*` タグの push で同じ版の GitHub Release に .pkg を載せる（v0.1.0 には手で追加済み）。作業は main で行う（ユーザー指定）。実装済み・友達の Mac で確認待ち
 - [ ] M2+M3（まとめて実施）: Windows 版の全機能（トラッキング・OSC、体のキャリブレーション、設定の保存、校正、2 台、
   手順ガイド・状態表示・上から見た図、閉じても動き続ける＝メニューバー）とアプリのアイコン。実装済み・友達の Mac で確認待ち。
-  **ViewModel の Tracking / CameraCalibration / Guide / Settings は Windows 版のファイルを Mac 版でもコンパイルして共有**
+  **ViewModel の Tracking / CameraCalibration / Guide / Settings と AppInfo.cs は Windows 版のファイルを Mac 版でもコンパイルして共有**
   （WPF の型を使わない。Settings のタイマーは `#if WINDOWS`）。MainViewModel.cs と Camera2.cs は Mac 版に写してあるので、
   Windows 版のこれらを変えたら Mac 版（src/WebcamFbt.Mac/ViewModels）にも同じ変更を入れる。画面（XAML）も同様
 

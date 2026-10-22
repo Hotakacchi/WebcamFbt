@@ -2,9 +2,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:WebcamFbt.App.ViewModels"
         xmlns:views="using:WebcamFbt.Mac.Views"
+        xmlns:app="using:WebcamFbt.App"
         x:Class="WebcamFbt.Mac.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="WebcamFbt - Webカメラ フルボディトラッキング"
+        Title="{x:Static app:AppInfo.WindowTitle}"
         Icon="/Assets/WebcamFbt.ico"
         Width="1280" Height="760" MinWidth="900" MinHeight="560"
         Background="#FF121316">
@@ -170,6 +171,10 @@
                                TextWrapping="Wrap" Margin="0,0,0,10" />
                     <Button Classes="Primary" Content="{Binding StartStopLabel}" Command="{Binding StartStopCommand}"
                             Height="40" FontSize="15" />
+                    <!-- 版（マウスを乗せるとコミットまで含む版） -->
+                    <TextBlock Text="{x:Static app:AppInfo.DisplayName}" ToolTip.Tip="{x:Static app:AppInfo.VersionDetail}"
+                               Foreground="{StaticResource SubTextBrush}" FontSize="11"
+                               HorizontalAlignment="Right" Margin="0,6,0,0" />
                 </StackPanel>
 
                 <!-- 手順ガイド（済んだ段階に ✓、次にやる段階を強調。押すと設定のタブを開く） -->

@@ -92,7 +92,7 @@ public partial class App : Application
     private void UpdateTrayText(MainViewModel vm)
     {
         if (_startStopItem != null) _startStopItem.Header = vm.IsBusy ? "中止（準備中）" : vm.StartStopLabel;
-        if (_tray != null) _tray.ToolTipText = $"WebcamFbt - {(vm.IsBusy ? "準備中" : vm.IsRunning ? "実行中" : "停止中")}";
+        if (_tray != null) _tray.ToolTipText = $"{WebcamFbt.App.AppInfo.DisplayName} - {(vm.IsBusy ? "準備中" : vm.IsRunning ? "実行中" : "停止中")}";
     }
 
     /// <summary>

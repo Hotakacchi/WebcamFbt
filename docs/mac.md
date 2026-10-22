@@ -19,7 +19,8 @@ Windows 版（`src/WebcamFbt.App`、WPF）はそのまま残し、Avalonia の�
 - ViewModel: 名前空間は Windows 版と同じ `WebcamFbt.App.ViewModels`。WPF に依存しない partial ファイルは
   **Windows 版のファイルをそのままコンパイルして共有**している（`WebcamFbt.Mac.csproj` の `<Compile Include=... Link=...>`）
   - 共有: `MainViewModel.Tracking.cs`（トラッキング・OSC）、`.CameraCalibration.cs`（チェッカーボード校正）、
-    `.Guide.cs`（手順ガイド・状態表示）、`.Settings.cs`（設定の保存。タイマーだけ `#if WINDOWS` で WPF / Avalonia を切り替え）
+    `.Guide.cs`（手順ガイド・状態表示）、`.Settings.cs`（設定の保存。タイマーだけ `#if WINDOWS` で WPF / Avalonia を切り替え）、
+    `src/WebcamFbt.App/AppInfo.cs`（版の表示。タイトル・右パネルの下・メニューバーのアイコンの説明）
   - Mac 版に写したもの: `MainViewModel.cs`（カメラ・推論・プレビュー）、`.Camera2.cs`（プレビューの画像の型が違うため）。
     Windows 版のこの 2 つを変えたら Mac 版にも同じ変更を入れる
   - 共有ファイルに WPF の型を書くと Mac 版のビルドが壊れる（各ファイルの先頭に注意書きあり）
