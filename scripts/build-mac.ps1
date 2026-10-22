@@ -96,6 +96,9 @@ foreach ($rid in $Rids) {
             Add-ZipFile $zip $_.FullName "WebcamFbt.app/Contents/MacOS/$rel" $mode
         }
         Add-ZipFile $zip (Join-Path $macProject 'Assets\WebcamFbt.icns') 'WebcamFbt.app/Contents/Resources/WebcamFbt.icns' 0x1A4
+        Add-ZipFile $zip (Join-Path $root 'LICENSE') 'WebcamFbt.app/Contents/Resources/LICENSE.txt' 0x1A4
+        Add-ZipFile $zip (Join-Path $root 'LICENSE-EXCEPTION.txt') 'WebcamFbt.app/Contents/Resources/LICENSE-EXCEPTION.txt' 0x1A4
+        Add-ZipFile $zip (Join-Path $root 'THIRD_PARTY_NOTICES.md') 'WebcamFbt.app/Contents/Resources/THIRD_PARTY_NOTICES.md' 0x1A4
         Add-ZipFile $zip $readme 'はじめにお読みください.txt' 0x1A4
     }
     finally {

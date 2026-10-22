@@ -10,6 +10,8 @@
     <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64" />
     <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true" />
     <welcome file="welcome.html" mime-type="text/html" />
+    <!-- Windows 版のインストーラと同じく、ライセンス（GPL-3.0-or-later）を見せる。LICENSE.txt は build-mac-pkg.sh が入れる -->
+    <license file="LICENSE.txt" mime-type="text/plain" />
     <conclusion file="conclusion.html" mime-type="text/html" />
 
     <!-- ONNX Runtime の macOS 版が 13.4 以上を要求する -->

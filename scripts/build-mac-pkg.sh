@@ -46,6 +46,10 @@ for ARCH in arm64 x64; do
     sed "s/\$(VERSION)/$VERSION/g" "$PACKAGING/Info.plist" > "$APP/Contents/Info.plist"
     mkdir -p "$APP/Contents/Resources"
     cp "$ROOT/src/WebcamFbt.Mac/Assets/WebcamFbt.icns" "$APP/Contents/Resources/WebcamFbt.icns"
+    # ライセンス（GPL-3.0-or-later と追加の許可）と、使っているライブラリ・モデルのライセンス
+    cp "$ROOT/LICENSE" "$APP/Contents/Resources/LICENSE.txt"
+    cp "$ROOT/LICENSE-EXCEPTION.txt" "$APP/Contents/Resources/LICENSE-EXCEPTION.txt"
+    cp "$ROOT/THIRD_PARTY_NOTICES.md" "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
     plutil -lint "$APP/Contents/Info.plist"
 
     # Intel 版 OpenCV が参照する Homebrew の libavif（使わない）を、無くても読み込めるようにする
@@ -79,9 +83,12 @@ done
 
 echo "--- インストーラ（両方入り） ---"
 sed "s/@VERSION@/$VERSION/g" "$PACKAGING/distribution.xml" > "$WORK/distribution.xml"
+# インストーラの画面に出すもの（ようこそ・ライセンス・終わり）。ライセンスはリポジトリの LICENSE をそのまま使う
+cp -R "$PACKAGING/pkg-resources" "$WORK/resources"
+cp "$ROOT/LICENSE" "$WORK/resources/LICENSE.txt"
 PKG="$RELEASE/WebcamFbt-$VERSION-mac.pkg"
 productbuild --distribution "$WORK/distribution.xml" \
-    --resources "$PACKAGING/pkg-resources" \
+    --resources "$WORK/resources" \
     --package-path "$WORK" \
     "$PKG"
 

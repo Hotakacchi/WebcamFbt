@@ -6,6 +6,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using WebcamFbt.App.ViewModels;
+using WebcamFbt.Mac.Platform;
 using WebcamFbt.Mac.Views;
 
 namespace WebcamFbt.Mac;
@@ -15,6 +16,7 @@ public partial class App : Application
     private MainWindow? _window;
     private TrayIcon? _tray;
     private NativeMenuItem? _startStopItem;
+    private NativeMenuItem? _updateItem;
     private bool _hiddenNoticeShown;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
@@ -61,8 +63,12 @@ public partial class App : Application
         _startStopItem.Click += (_, _) => vm.StartStopCommand.Execute(null);
         var exit = new NativeMenuItem("終了");
         exit.Click += (_, _) => Shutdown();
+        // 新しい版が出ているときだけ、一番上に出す
+        _updateItem = new NativeMenuItem { IsVisible = false };
+        _updateItem.Click += (_, _) => vm.OpenUpdatePageCommand.Execute(null);
 
         var menu = new NativeMenu();
+        menu.Items.Add(_updateItem);
         menu.Items.Add(show);
         menu.Items.Add(_startStopItem);
         menu.Items.Add(new NativeMenuItemSeparator());
@@ -78,13 +84,26 @@ public partial class App : Application
 
         vm.PropertyChanged += OnViewModelPropertyChanged;
         UpdateTrayText(vm);
+
+        // 新しい版が見つかったとき、画面が隠れていれば通知センターで知らせる（見えていれば画面の上の帯で分かる）
+        vm.UpdateFound += update =>
+        {
+            if (!window.IsVisible)
+            {
+                MacNotification.Show($"WebcamFbt の新しい版 v{update.Version} が出ています",
+                    "メニューバーの WebcamFbt のアイコンから、ダウンロードのページを開けます。");
+            }
+        };
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is MainViewModel vm && e.PropertyName is nameof(MainViewModel.IsRunning) or nameof(MainViewModel.IsBusy))
+        if (sender is not MainViewModel vm) return;
+        if (e.PropertyName is nameof(MainViewModel.IsRunning) or nameof(MainViewModel.IsBusy)) UpdateTrayText(vm);
+        if (e.PropertyName is nameof(MainViewModel.HasUpdate) && _updateItem != null)
         {
-            UpdateTrayText(vm);
+            _updateItem.Header = vm.HasUpdate ? $"{vm.UpdateBannerText}（ダウンロードのページを開く）" : "";
+            _updateItem.IsVisible = vm.HasUpdate;
         }
     }
 

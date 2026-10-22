@@ -100,6 +100,10 @@ jobs:
           APP=/Applications/WebcamFbt.app
           # 「前の版にだけあったファイル」の代わり
           sudo touch "$APP/Contents/MacOS/old-version-only.txt"
+          # 設定ファイル（~/Library/Application Support/WebcamFbt）は入れ直しても残るか
+          DATA="$HOME/Library/Application Support/WebcamFbt"
+          mkdir -p "$DATA"
+          echo '{"marker":"keep-me"}' > "$DATA/update-test.json"
           "$APP/Contents/MacOS/WebcamFbt" &
           PID=$!
           sleep 10
@@ -115,6 +119,11 @@ jobs:
           if [ -e "$APP/Contents/MacOS/old-version-only.txt" ]; then
             echo "前の版のファイルが残っています"; exit 1
           fi
+          grep -q keep-me "$DATA/update-test.json" || { echo "設定のフォルダの中身が消えました"; exit 1; }
+          rm "$DATA/update-test.json"
+          test -f "$APP/Contents/Resources/LICENSE.txt"
+          test -f "$APP/Contents/Resources/LICENSE-EXCEPTION.txt"
+          test -f "$APP/Contents/Resources/THIRD_PARTY_NOTICES.md"
           test -x "$APP/Contents/MacOS/WebcamFbt"
           codesign --verify --deep --strict "$APP"
           pkgutil --pkg-info io.github.hotakacchi.webcamfbt.arm64
