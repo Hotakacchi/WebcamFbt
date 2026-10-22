@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WebcamFbt.App/WebcamFbt.App.csproj" />
+    <Project Path="src/WebcamFbt.Core/WebcamFbt.Core.csproj" />
+    <Project Path="src/WebcamFbt.Vision/WebcamFbt.Vision.csproj" />
+  </Folder>
+</Solution>

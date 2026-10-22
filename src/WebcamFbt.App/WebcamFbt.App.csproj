@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>WebcamFbt</AssemblyName>
+    <RootNamespace>WebcamFbt.App</RootNamespace>
+    <!-- Linux 等でビルドだけ確認したい場合のため -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.*" />
+    <PackageReference Include="OpenCvSharp4.WpfExtensions" Version="4.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WebcamFbt.Core\WebcamFbt.Core.csproj" />
+    <ProjectReference Include="..\WebcamFbt.Vision\WebcamFbt.Vision.csproj" />
+  </ItemGroup>
+</Project>

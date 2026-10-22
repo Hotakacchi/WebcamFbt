@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- カメラ入力・ONNX推論・描画など、OpenCvSharp と ONNX Runtime に依存する部分 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- DirectML 版パッケージには CPU 実行プロバイダーも含まれる -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.*" />
+    <PackageReference Include="OpenCvSharp4" Version="4.*" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WebcamFbt.Core\WebcamFbt.Core.csproj" />
+  </ItemGroup>
+</Project>

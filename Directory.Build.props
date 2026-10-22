@@ -1,0 +1,15 @@
+<Project>
+  <!-- 全プロジェクト共通の設定 -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <!-- Windows 以外の環境でもビルドだけはできるようにする（実行は Windows のみ） -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Company>WebcamFbt</Company>
+    <Product>WebcamFbt</Product>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,21 @@
+# ビルド成果物
+bin/
+obj/
+publish/
+artifacts/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# モデル（ライセンスとサイズの都合でリポジトリに含めない）
+models/*.onnx
+models/*.zip
+*.onnx.sha256
+
+# その他
+*.log
+TestResults/

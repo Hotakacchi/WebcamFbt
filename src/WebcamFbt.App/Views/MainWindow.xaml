@@ -1,0 +1,102 @@
+<Window x:Class="WebcamFbt.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:WebcamFbt.App.ViewModels"
+        Title="WebcamFbt - Webカメラ フルボディトラッキング"
+        Width="1280" Height="760" MinWidth="900" MinHeight="560"
+        Background="#FF121316">
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="300" />
+        </Grid.ColumnDefinitions>
+
+        <!-- プレビュー -->
+        <Grid Grid.Column="0" Margin="12">
+            <Border Background="Black" CornerRadius="6">
+                <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
+            </Border>
+            <TextBlock Text="「開始」を押すとカメラ映像が表示されます"
+                       Foreground="{StaticResource SubTextBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding PreviewImage}" Value="{x:Null}">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <!-- 統計情報（左上に重ねて表示） -->
+            <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
+                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10">
+                <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
+                           FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="13" />
+            </Border>
+        </Grid>
+
+        <!-- 設定パネル -->
+        <Border Grid.Column="1" Background="{StaticResource PanelBrush}">
+            <DockPanel Margin="16,8,16,16">
+                <StackPanel DockPanel.Dock="Bottom">
+                    <ProgressBar Height="4" Maximum="1" Value="{Binding Progress}" Margin="0,0,0,8">
+                        <ProgressBar.Style>
+                            <Style TargetType="ProgressBar">
+                                <Setter Property="Visibility" Value="Hidden" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ProgressBar.Style>
+                    </ProgressBar>
+                    <TextBlock Text="{Binding Status}" Foreground="{StaticResource SubTextBrush}"
+                               TextWrapping="Wrap" Margin="0,0,0,10" />
+                    <Button Content="{Binding StartStopLabel}" Command="{Binding StartStopCommand}"
+                            Height="40" FontSize="15" />
+                </StackPanel>
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="カメラ" Style="{StaticResource SectionHeader}" />
+                        <StackPanel IsEnabled="{Binding CanEditSettings}">
+                            <TextBlock Text="デバイス" Style="{StaticResource Label}" />
+                            <ComboBox ItemsSource="{Binding CameraChoices}" SelectedItem="{Binding SelectedCamera}" />
+                            <TextBlock Text="解像度" Style="{StaticResource Label}" />
+                            <ComboBox ItemsSource="{Binding ResolutionChoices}" SelectedItem="{Binding SelectedResolution}" />
+                            <TextBlock Text="フレームレート" Style="{StaticResource Label}" />
+                            <ComboBox ItemsSource="{Binding FpsChoices}" SelectedItem="{Binding SelectedFps}" />
+                            <TextBlock Text="取得方式" Style="{StaticResource Label}" />
+                            <ComboBox ItemsSource="{Binding BackendChoices}" SelectedItem="{Binding SelectedBackend}" />
+                        </StackPanel>
+
+                        <TextBlock Text="推論" Style="{StaticResource SectionHeader}" />
+                        <StackPanel IsEnabled="{Binding CanEditSettings}">
+                            <TextBlock Text="実行デバイス" Style="{StaticResource Label}" />
+                            <ComboBox ItemsSource="{Binding DeviceChoices}" SelectedItem="{Binding SelectedDevice}" />
+                        </StackPanel>
+
+                        <TextBlock Text="表示" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="信頼度のしきい値: " /><Run Text="{Binding ScoreThreshold, StringFormat=F2, Mode=OneWay}" />
+                        </TextBlock>
+                        <Slider Minimum="0" Maximum="1" SmallChange="0.05" LargeChange="0.1"
+                                Value="{Binding ScoreThreshold}" />
+                        <CheckBox Content="左右反転して表示（鏡モード）" IsChecked="{Binding MirrorPreview}"
+                                  Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
+                        <CheckBox Content="プレビューを表示（オフで少し軽くなる）" IsChecked="{Binding PreviewEnabled}"
+                                  Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>
