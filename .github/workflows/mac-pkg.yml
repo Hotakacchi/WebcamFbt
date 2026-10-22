@@ -50,6 +50,32 @@ jobs:
           file "$APP/Contents/MacOS/WebcamFbt" | grep -q arm64
           codesign --verify --deep --strict --verbose=2 "$APP"
           "$APP/Contents/MacOS/WebcamFbt" --self-test
+          # アイコン（.icns）が入っていて、macOS が読める形か
+          test "$(defaults read "$APP/Contents/Info" CFBundleIconFile)" = WebcamFbt
+          iconutil -c iconset "$APP/Contents/Resources/WebcamFbt.icns" -o "$RUNNER_TEMP/WebcamFbt.iconset"
+          ls "$RUNNER_TEMP/WebcamFbt.iconset"
+
+      # 各タブの画面を PNG に保存する（Mac での見た目を確かめるため。Artifacts の WebcamFbt-mac-screenshots）
+      - name: 画面を撮る
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/screenshots"
+          /Applications/WebcamFbt.app/Contents/MacOS/WebcamFbt --screenshot "$RUNNER_TEMP/screenshots" &
+          PID=$!
+          # 撮り終えると自分で終了する（6 秒ほど）。60 秒たっても残っていれば止める
+          for i in $(seq 60); do
+            case "$(ps -o stat= -p "$PID" || true)" in ''|Z*) break ;; esac
+            sleep 1
+          done
+          kill "$PID" 2>/dev/null || true
+          ls -la "$RUNNER_TEMP/screenshots"
+
+      - uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: WebcamFbt-mac-screenshots
+          path: ${{ runner.temp }}/screenshots
+          retention-days: 7
 
       - name: 画面つきで起動して、すぐ落ちないか確かめる
         continue-on-error: true

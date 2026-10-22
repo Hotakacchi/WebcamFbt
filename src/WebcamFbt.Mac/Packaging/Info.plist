@@ -11,6 +11,9 @@
     <string>io.github.hotakacchi.webcamfbt</string>
     <key>CFBundleExecutable</key>
     <string>WebcamFbt</string>
+    <!-- Dock や Finder のアイコン（Contents/Resources/WebcamFbt.icns。scripts\make-icon.ps1 -MacIcns で作る） -->
+    <key>CFBundleIconFile</key>
+    <string>WebcamFbt</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>

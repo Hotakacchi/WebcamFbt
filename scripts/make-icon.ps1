@@ -1,12 +1,13 @@
 ﻿# アプリのアイコン（src\WebcamFbt.App\Assets\WebcamFbt.ico）を、元画像（Assets\icon-source.png）から作る（フェーズ 5c）。
 #
 #   pwsh -File scripts\make-icon.ps1 [-PreviewPng <確認用 PNG の保存先>]
+#   pwsh -File scripts\make-icon.ps1 -MacIcns src\WebcamFbt.Mac\Assets\WebcamFbt.icns   （Mac 版の .app のアイコンも作る）
 #
 # 元画像は白い背景の上に角丸の四角が描かれたもの。白い余白を透明にするため、
 #  1. 白でない画素の範囲（外枠）と、左上の角の丸み（対角線上で絵が始まる位置）から角丸の半径を測る
 #  2. 角丸の四角の形で切り抜く（縁はアンチエイリアス。白がにじまないよう少し内側で切る）
 #  3. 16〜256px に縮小して ICO にする（256px は PNG、それ以外は 32bit の DIB）
-param([string]$PreviewPng)
+param([string]$PreviewPng, [string]$MacIcns)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
@@ -64,6 +65,51 @@ $path.CloseFigure()
 $g.FillPath($brush, $path)
 $g.Dispose()
 $source.Dispose()
+
+# ---- Mac 版のアイコン（.icns） ----
+# macOS のアイコンの決まりに合わせ、1024px の中央 824px に絵を収めて周りを透明にし、各サイズの PNG を .icns に詰める。
+# .icns は「'icns' + 全体の長さ」の後に「種類（4 文字）+ 長さ + PNG」が並ぶだけの形式（長さはビッグエンディアン）
+if ($MacIcns) {
+    $macBmp = New-Object System.Drawing.Bitmap(1024, 1024, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $mg = [System.Drawing.Graphics]::FromImage($macBmp)
+    $mg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $mg.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $mg.Clear([System.Drawing.Color]::Transparent)
+    $mg.DrawImage($masterBmp, 100, 100, 824, 824)
+    $mg.Dispose()
+
+    # 種類と大きさ: ic11=16@2x, ic12=32@2x, ic07=128, ic13=128@2x, ic08=256, ic14=256@2x, ic09=512, ic10=512@2x
+    $entries = @(('ic11', 32), ('ic12', 64), ('ic07', 128), ('ic13', 256), ('ic08', 256), ('ic14', 512), ('ic09', 512), ('ic10', 1024))
+    $chunks = foreach ($e in $entries) {
+        $size = $e[1]
+        $small = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+        $sg = [System.Drawing.Graphics]::FromImage($small)
+        $sg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $sg.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $sg.Clear([System.Drawing.Color]::Transparent)
+        $sg.DrawImage($macBmp, 0, 0, $size, $size)
+        $sg.Dispose()
+        $pngStream = New-Object System.IO.MemoryStream
+        $small.Save($pngStream, [System.Drawing.Imaging.ImageFormat]::Png)
+        $small.Dispose()
+        , @($e[0], $pngStream.ToArray())
+    }
+    $macBmp.Dispose()
+
+    function BigEndian([int]$v) { $b = [BitConverter]::GetBytes($v); [Array]::Reverse($b); , $b }
+    $total = 8
+    foreach ($c in $chunks) { $total += 8 + $c[1].Length }
+    $fs = [System.IO.File]::Create((Join-Path (Get-Location) $MacIcns))
+    $fs.Write([System.Text.Encoding]::ASCII.GetBytes('icns'), 0, 4)
+    $fs.Write((BigEndian $total), 0, 4)
+    foreach ($c in $chunks) {
+        $fs.Write([System.Text.Encoding]::ASCII.GetBytes($c[0]), 0, 4)
+        $fs.Write((BigEndian (8 + $c[1].Length)), 0, 4)
+        $fs.Write($c[1], 0, $c[1].Length)
+    }
+    $fs.Dispose()
+    Write-Host "Mac 版のアイコンを作りました: $MacIcns（$total バイト）"
+}
 
 # ---- 3. 各サイズに縮小して ICO にする ----
 function Resize([System.Drawing.Bitmap]$src, [int]$size) {

@@ -29,7 +29,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AvaloniaResource Include="Assets\**" />
+    <!-- .icns は .app の Contents/Resources に入れる（build-mac-pkg.sh / build-mac.ps1）ので埋め込まない -->
+    <AvaloniaResource Include="Assets\**" Exclude="Assets\*.icns" />
+  </ItemGroup>
+
+  <!--
+    Windows 版の ViewModel のうち WPF に依存しない部分は、同じファイルをそのままコンパイルして共有する
+    （トラッキング・OSC、カメラの校正、手順ガイドと状態表示、設定の保存）。機能と文言が Windows 版と自動でそろう。
+    カメラ・プレビュー部分（MainViewModel.cs、MainViewModel.Camera2.cs）は画像の型が違うので Mac 版に写してある。
+  -->
+  <ItemGroup>
+    <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.Tracking.cs" Link="ViewModels\Shared\MainViewModel.Tracking.cs" />
+    <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.CameraCalibration.cs" Link="ViewModels\Shared\MainViewModel.CameraCalibration.cs" />
+    <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.Guide.cs" Link="ViewModels\Shared\MainViewModel.Guide.cs" />
+    <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.Settings.cs" Link="ViewModels\Shared\MainViewModel.Settings.cs" />
   </ItemGroup>
 
   <ItemGroup>

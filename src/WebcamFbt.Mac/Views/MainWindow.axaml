@@ -1,9 +1,11 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:WebcamFbt.Mac.ViewModels"
+        xmlns:vm="using:WebcamFbt.App.ViewModels"
+        xmlns:views="using:WebcamFbt.Mac.Views"
         x:Class="WebcamFbt.Mac.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="WebcamFbt - Webカメラ フルボディトラッキング"
+        Icon="/Assets/WebcamFbt.ico"
         Width="1280" Height="760" MinWidth="900" MinHeight="560"
         Background="#FF121316">
     <!-- 並びと文言は Windows 版（WebcamFbt.App/Views/MainWindow.xaml）にそろえる -->
@@ -11,25 +13,149 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
+    <Window.Resources>
+        <!-- 状態表示 1 つ分（色付きの点＋名前） -->
+        <DataTemplate x:Key="IndicatorTemplate" x:DataType="vm:StatusIndicator">
+            <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                <Ellipse Width="10" Height="10" VerticalAlignment="Center"
+                         Fill="{Binding State, Converter={x:Static views:IndicatorBrushConverter.Instance}}" />
+                <TextBlock Text="{Binding Label}" Foreground="#FFE6E6E6" Margin="4,0,0,0" FontSize="12" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
+        <ItemsPanelTemplate x:Key="HorizontalPanel">
+            <StackPanel Orientation="Horizontal" />
+        </ItemsPanelTemplate>
+    </Window.Resources>
+
+    <Window.Styles>
+        <!-- 手順ガイド: 済んだ段階は緑の ✓、次にやる段階は青で強調してヒントを出す -->
+        <Style Selector="Border.Badge">
+            <Setter Property="Background" Value="{StaticResource OffBrush}" />
+        </Style>
+        <Style Selector="Border.Badge.done">
+            <Setter Property="Background" Value="{StaticResource GoodBrush}" />
+        </Style>
+        <Style Selector="Border.Badge.current">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        </Style>
+        <Style Selector="TextBlock.StepTitle">
+            <Setter Property="Foreground" Value="{StaticResource SubTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.StepTitle.current">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- 枠のないボタン（手順ガイドの各段階） -->
+        <Style Selector="Button.Flat">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.Flat:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#18FFFFFF" />
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="Padding" Value="6,3" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.Wide">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </Window.Styles>
+
     <Grid ColumnDefinitions="*,330">
 
         <!-- プレビュー -->
         <Grid Grid.Column="0" Margin="12">
-            <Border Background="Black" CornerRadius="6" ClipToBounds="True">
-                <Image Source="{Binding PreviewImage}" Stretch="Uniform"
-                       RenderOptions.BitmapInterpolationMode="LowQuality" />
-            </Border>
-            <TextBlock Text="「開始」を押すとカメラ映像が表示されます"
-                       Foreground="{StaticResource SubTextBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       IsVisible="{Binding PreviewImage, Converter={x:Static ObjectConverters.IsNull}}" />
-            <!-- 統計情報（左上に重ねて表示） -->
-            <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
-                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
-                    IsVisible="{Binding StatsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
-                           FontFamily="{StaticResource MonoFont}" FontSize="13" />
-            </Border>
+            <!-- 単眼プレビュー（1台モード） -->
+            <Grid IsVisible="{Binding !TwoCameraMode}">
+                <Border Background="Black" CornerRadius="6" ClipToBounds="True">
+                    <Image Source="{Binding PreviewImage}" Stretch="Uniform"
+                           RenderOptions.BitmapInterpolationMode="LowQuality" />
+                </Border>
+                <TextBlock Text="「開始」を押すとカメラ映像が表示されます"
+                           Foreground="{StaticResource SubTextBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           IsVisible="{Binding PreviewImage, Converter={x:Static ObjectConverters.IsNull}}" />
+                <!-- 統計情報（左上に重ねて表示） -->
+                <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
+                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
+                        IsVisible="{Binding StatsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
+                               FontFamily="{StaticResource MonoFont}" FontSize="13" />
+                </Border>
+                <!-- トラッカーの値（左下に重ねて表示） -->
+                <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
+                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10"
+                        IsVisible="{Binding TrackingText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding Indicators}" ItemTemplate="{StaticResource IndicatorTemplate}"
+                                      ItemsPanel="{StaticResource HorizontalPanel}" Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding TrackingText}" Foreground="#FFE6E6E6"
+                                   FontFamily="{StaticResource MonoFont}" FontSize="13" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 2台プレビュー（ステレオモード） -->
+            <Grid IsVisible="{Binding TwoCameraMode}" ColumnDefinitions="*,*">
+                <!-- カメラ1（トラッキングに使用） -->
+                <Grid Grid.Column="0" Margin="0,0,6,0">
+                    <Border Background="Black" CornerRadius="6" ClipToBounds="True">
+                        <Image Source="{Binding PreviewImage}" Stretch="Uniform"
+                               RenderOptions.BitmapInterpolationMode="LowQuality" />
+                    </Border>
+                    <Border Background="#AA000000" CornerRadius="4" Padding="8,4"
+                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                            IsVisible="{Binding StatsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
+                                   FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                    </Border>
+                    <Border Background="#AA1E6FEB" CornerRadius="4" Padding="8,3"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
+                        <TextBlock Text="カメラ1" Foreground="White" FontWeight="SemiBold" FontSize="12" />
+                    </Border>
+                    <Border Background="#AA000000" CornerRadius="4" Padding="8,4"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8"
+                            IsVisible="{Binding TrackingText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <StackPanel>
+                            <ItemsControl ItemsSource="{Binding Indicators}" ItemTemplate="{StaticResource IndicatorTemplate}"
+                                          ItemsPanel="{StaticResource HorizontalPanel}" Margin="0,0,0,6" />
+                            <TextBlock Text="{Binding TrackingText}" Foreground="#FFE6E6E6"
+                                       FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- カメラ2（プレビュー＋2Dのみ） -->
+                <Grid Grid.Column="1" Margin="6,0,0,0">
+                    <Border Background="Black" CornerRadius="6" ClipToBounds="True">
+                        <Image Source="{Binding PreviewImage2}" Stretch="Uniform"
+                               RenderOptions.BitmapInterpolationMode="LowQuality" />
+                    </Border>
+                    <Border Background="#AA000000" CornerRadius="4" Padding="8,4"
+                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                            IsVisible="{Binding StatsText2, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding StatsText2}" Foreground="#FFE6E6E6"
+                                   FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                    </Border>
+                    <Border Background="#AA1E6FEB" CornerRadius="4" Padding="8,3"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
+                        <TextBlock Text="カメラ2" Foreground="White" FontWeight="SemiBold" FontSize="12" />
+                    </Border>
+                </Grid>
+            </Grid>
+
+            <!-- 上から見たトラッカー（右下に重ねて表示。実行中だけ） -->
+            <views:TrackerTopDownView Frame="{Binding TopDownFrame}" Width="170" Height="180"
+                                      HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="10"
+                                      IsVisible="{Binding IsRunning}" />
         </Grid>
 
         <!-- 設定パネル -->
@@ -46,11 +172,42 @@
                             Height="40" FontSize="15" />
                 </StackPanel>
 
+                <!-- 手順ガイド（済んだ段階に ✓、次にやる段階を強調。押すと設定のタブを開く） -->
+                <Border DockPanel.Dock="Top" Background="{StaticResource CardBrush}" CornerRadius="6" Padding="8,6" Margin="0,8,0,4">
+                    <ItemsControl ItemsSource="{Binding GuideSteps}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GuideStep">
+                                <Button Classes="Flat"
+                                        Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).GoToStepCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <Border Classes="Badge" Classes.done="{Binding IsDone}" Classes.current="{Binding IsCurrent}"
+                                                Width="20" Height="20" CornerRadius="10" VerticalAlignment="Top" Margin="0,1,8,0">
+                                            <Panel>
+                                                <TextBlock Text="{Binding Number}" IsVisible="{Binding !IsDone}" Foreground="White" FontSize="11"
+                                                           FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <TextBlock Text="✓" IsVisible="{Binding IsDone}" Foreground="White" FontSize="11"
+                                                           FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Panel>
+                                        </Border>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Classes="StepTitle" Classes.current="{Binding IsCurrent}" Text="{Binding Title}" FontSize="12" />
+                                            <TextBlock Text="{Binding Hint}" Foreground="{StaticResource SubTextBrush}" FontSize="10.5"
+                                                       TextWrapping="Wrap" IsVisible="{Binding IsCurrent}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+
+                <!-- タブの並びは MainViewModel.Guide.cs の定数（TabCamera など）と同じにする -->
                 <TabControl SelectedIndex="{Binding SelectedSettingsTab}" Padding="0,4,0,0">
                     <!-- ===== カメラ ===== -->
                     <TabItem Header="カメラ">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="0,0,6,0">
+                            <StackPanel Margin="0,0,10,0">
                                 <TextBlock Text="カメラ" Classes="SectionHeader" />
                                 <StackPanel IsEnabled="{Binding CanEditSettings}">
                                     <TextBlock Text="デバイス" Classes="Label" />
@@ -61,6 +218,12 @@
                                     <ComboBox ItemsSource="{Binding FpsChoices}" SelectedItem="{Binding SelectedFps}" />
                                     <TextBlock Text="取得方式" Classes="Label" />
                                     <ComboBox ItemsSource="{Binding BackendChoices}" SelectedItem="{Binding SelectedBackend}" />
+                                    <CheckBox Content="カメラを2台使う（ステレオ）" IsChecked="{Binding TwoCameraMode}"
+                                              Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
+                                    <StackPanel IsVisible="{Binding TwoCameraMode}">
+                                        <TextBlock Text="カメラ2 デバイス（解像度・fps はカメラ1と同じ）" Classes="Label" />
+                                        <ComboBox ItemsSource="{Binding CameraChoices}" SelectedItem="{Binding SelectedCamera2}" />
+                                    </StackPanel>
                                 </StackPanel>
 
                                 <TextBlock Text="推論" Classes="SectionHeader" />
@@ -83,19 +246,126 @@
                         </ScrollViewer>
                     </TabItem>
 
-                    <!-- ===== トラッキング（M2 で移植） ===== -->
+                    <!-- ===== トラッキング ===== -->
                     <TabItem Header="トラッキング">
-                        <TextBlock Text="Mac 版では次の段階で対応します。" Classes="Label" TextWrapping="Wrap" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="体とカメラ" Classes="SectionHeader" />
+                                <CheckBox Content="2台のときは三角測量で3D化する（ステレオ校正が必要）" IsChecked="{Binding UseStereoTracking}"
+                                          IsVisible="{Binding TwoCameraMode}"
+                                          Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                                <TextBlock Classes="Label">
+                                    <Run Text="身長: " /><Run Text="{Binding HeightMeters, StringFormat=F2}" /><Run Text=" m" />
+                                </TextBlock>
+                                <Slider Minimum="1.2" Maximum="2.1" SmallChange="0.01" LargeChange="0.05"
+                                        TickFrequency="0.01" IsSnapToTickEnabled="True" Value="{Binding HeightMeters}" />
+                                <TextBlock Classes="Label">
+                                    <Run Text="カメラの水平画角: " /><Run Text="{Binding HorizontalFov, StringFormat=F0}" /><Run Text="°" />
+                                </TextBlock>
+                                <Slider Minimum="40" Maximum="120" SmallChange="1" LargeChange="5"
+                                        TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding HorizontalFov}" />
+                                <TextBlock Classes="Label">
+                                    <Run Text="カメラの傾き（下向きが +）: " /><Run Text="{Binding CameraPitch, StringFormat=F0}" /><Run Text="°" />
+                                </TextBlock>
+                                <Slider Minimum="-45" Maximum="45" SmallChange="1" LargeChange="5"
+                                        TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding CameraPitch}" />
+                                <TextBlock Classes="Label">
+                                    <Run Text="トラッキングに使う信頼度: " /><Run Text="{Binding TrackingThreshold, StringFormat=F2}" />
+                                </TextBlock>
+                                <Slider Minimum="0.1" Maximum="0.9" SmallChange="0.05" LargeChange="0.1"
+                                        Value="{Binding TrackingThreshold}" />
+
+                                <TextBlock Text="体のキャリブレーション（T ポーズ）" Classes="SectionHeader" />
+                                <TextBlock Text="カメラの方を向いて T ポーズ（全身が映る位置）で立ち、ボタンを押してください。数秒ぶん測って体の比率・床の高さ・正面方向を合わせます。"
+                                           Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                                <Button Classes="Wide" Content="キャリブレーション開始" Command="{Binding CalibrateCommand}"
+                                        Margin="0,8,0,0" Height="30" />
+                                <Button Classes="Wide" Content="解除（既定値に戻す）" Command="{Binding ClearCalibrationCommand}"
+                                        Margin="0,6,0,0" Height="26" />
+                                <TextBlock Text="{Binding CalibrationText}" Foreground="{StaticResource SubTextBrush}"
+                                           FontFamily="{StaticResource MonoFont}" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                                <Expander Header="詳細: 平滑化（One Euro Filter）" Margin="0,16,0,0" HorizontalAlignment="Stretch">
+                                    <StackPanel>
+                                        <TextBlock Text="min cutoff を下げる → 静止時のブレが減る（遅れる）&#x0a;beta を上げる → 速い動きの遅れが減る（ブレやすい）"
+                                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                                        <TextBlock Classes="Label">
+                                            <Run Text="位置 min cutoff: " /><Run Text="{Binding PositionMinCutoff, StringFormat=F2}" /><Run Text=" Hz" />
+                                        </TextBlock>
+                                        <Slider Minimum="0.05" Maximum="5" SmallChange="0.05" LargeChange="0.25" Value="{Binding PositionMinCutoff}" />
+                                        <TextBlock Classes="Label">
+                                            <Run Text="位置 beta: " /><Run Text="{Binding PositionBeta, StringFormat=F2}" />
+                                        </TextBlock>
+                                        <Slider Minimum="0" Maximum="5" SmallChange="0.05" LargeChange="0.25" Value="{Binding PositionBeta}" />
+                                        <TextBlock Classes="Label">
+                                            <Run Text="回転 min cutoff: " /><Run Text="{Binding RotationMinCutoff, StringFormat=F2}" /><Run Text=" Hz" />
+                                        </TextBlock>
+                                        <Slider Minimum="0.05" Maximum="5" SmallChange="0.05" LargeChange="0.25" Value="{Binding RotationMinCutoff}" />
+                                        <TextBlock Classes="Label">
+                                            <Run Text="回転 beta: " /><Run Text="{Binding RotationBeta, StringFormat=F2}" />
+                                        </TextBlock>
+                                        <Slider Minimum="0" Maximum="3" SmallChange="0.05" LargeChange="0.25" Value="{Binding RotationBeta}" />
+                                        <Button Classes="Wide" Content="初期値に戻す" Command="{Binding ResetFilterParamsCommand}" Margin="0,8,0,0" Height="26" />
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
 
-                    <!-- ===== 校正（M3 で移植） ===== -->
+                    <!-- ===== 校正 ===== -->
                     <TabItem Header="校正">
-                        <TextBlock Text="Mac 版では次の段階で対応します。" Classes="Label" TextWrapping="Wrap" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="カメラの校正（チェッカーボード）" Classes="SectionHeader" />
+                                <TextBlock Text="印刷したチェッカーボードをカメラに向け、位置と傾きを変えながら毎回少し止めます。2台のときは両方に写る位置で。1マスの大きさは定規で測った値を入れてください。"
+                                           Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                                <Grid IsEnabled="{Binding CanEditBoard}" Margin="0,4,0,0" ColumnDefinitions="*,*,*">
+                                    <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                        <TextBlock Text="交点（横）" Classes="Label" />
+                                        <TextBox Text="{Binding BoardInnerCols}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="2,0,2,0">
+                                        <TextBlock Text="交点（縦）" Classes="Label" />
+                                        <TextBox Text="{Binding BoardInnerRows}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                        <TextBlock Text="1マス [mm]" Classes="Label" />
+                                        <TextBox Text="{Binding BoardSquareMm}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,8,0,0" ColumnDefinitions="*,Auto">
+                                    <Button Grid.Column="0" Classes="Wide" Content="校正を開始" Command="{Binding StartCameraCalibrationCommand}" Height="30" />
+                                    <Button Grid.Column="1" Content="中止" Command="{Binding CancelCameraCalibrationCommand}"
+                                            Height="30" Margin="4,0,0,0" Padding="12,0" VerticalContentAlignment="Center" />
+                                </Grid>
+                                <TextBlock Text="{Binding CameraCalibrationText}" Foreground="{StaticResource SubTextBrush}"
+                                           FontFamily="{StaticResource MonoFont}" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,8,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
 
-                    <!-- ===== VRChat（M2 で移植） ===== -->
+                    <!-- ===== VRChat ===== -->
                     <TabItem Header="VRChat">
-                        <TextBlock Text="Mac 版では次の段階で対応します。" Classes="Label" TextWrapping="Wrap" />
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="0,0,10,0">
+                                <TextBlock Text="VRChat（OSC）" Classes="SectionHeader" />
+                                <CheckBox Content="VRChat に送信する" IsChecked="{Binding OscEnabled}"
+                                          Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                                <CheckBox Content="頭の位置を送る（位置合わせ用）" IsChecked="{Binding SendHeadPosition}"
+                                          Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                                <TextBlock Text="送信先（Quest 単体なら Quest の IP）" Classes="Label" />
+                                <Grid ColumnDefinitions="*,64,Auto">
+                                    <TextBox Grid.Column="0" Text="{Binding OscHost}" />
+                                    <TextBox Grid.Column="1" Text="{Binding OscPort}" Margin="4,0,0,0" />
+                                    <Button Grid.Column="2" Content="反映" Command="{Binding ApplyOscEndpointCommand}" Margin="4,0,0,0"
+                                            Padding="10,0" VerticalAlignment="Stretch" VerticalContentAlignment="Center" />
+                                </Grid>
+                                <Button Classes="Wide" Content="向きを合わせる（カメラの方を向いて押す）" Command="{Binding AlignYawCommand}"
+                                        Margin="0,10,0,0" Height="30" />
+                            </StackPanel>
+                        </ScrollViewer>
                     </TabItem>
                 </TabControl>
             </DockPanel>

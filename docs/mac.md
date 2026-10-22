@@ -15,8 +15,20 @@ Windows 版（`src/WebcamFbt.App`、WPF）はそのまま残し、Avalonia の�
 - 推論（`OnnxSessionFactory`）: Mac は CoreML 実行プロバイダー（MLProgram 形式、CPU/GPU/Neural Engine 全部）を試し、
   失敗したら CPU。DirectML 用の `EnableMemoryPattern=false` は CoreML には付けない。CoreML への変換結果は
   `~/Library/Application Support/WebcamFbt/coreml-cache` に置き、2 回目以降の起動を速くする
-- 画面: Windows 版と同じ並び・文言・色（右に 330px の設定パネルとタブ、左にプレビューと統計）。
-  ViewModel は Windows 版を写して Avalonia 向けに直したもの（Windows 版に手を入れないため共通化はしていない）
+- 画面: Windows 版と同じ並び・文言・色（右に 330px の設定パネルとタブ、左にプレビューと統計、手順ガイド、状態表示、上から見た図）
+- ViewModel: 名前空間は Windows 版と同じ `WebcamFbt.App.ViewModels`。WPF に依存しない partial ファイルは
+  **Windows 版のファイルをそのままコンパイルして共有**している（`WebcamFbt.Mac.csproj` の `<Compile Include=... Link=...>`）
+  - 共有: `MainViewModel.Tracking.cs`（トラッキング・OSC）、`.CameraCalibration.cs`（チェッカーボード校正）、
+    `.Guide.cs`（手順ガイド・状態表示）、`.Settings.cs`（設定の保存。タイマーだけ `#if WINDOWS` で WPF / Avalonia を切り替え）
+  - Mac 版に写したもの: `MainViewModel.cs`（カメラ・推論・プレビュー）、`.Camera2.cs`（プレビューの画像の型が違うため）。
+    Windows 版のこの 2 つを変えたら Mac 版にも同じ変更を入れる
+  - 共有ファイルに WPF の型を書くと Mac 版のビルドが壊れる（各ファイルの先頭に注意書きあり）
+- 閉じるボタン: Windows 版の「タスクトレイに入る」に合わせ、画面だけ隠して動き続ける。メニューバー（右上）のアイコンから
+  「表示」「開始 / 停止」「終了」、Dock のアイコンを押しても画面が出る。command + Q で終了
+- アイコン: `src/WebcamFbt.Mac/Assets/WebcamFbt.icns`（`pwsh -File scripts\make-icon.ps1 -MacIcns src\WebcamFbt.Mac\Assets\WebcamFbt.icns`
+  で Windows 版と同じ絵から作る。PNG を詰めただけの形式なので Windows で作れる）を `Contents/Resources` に入れる。
+  メニューバーとウィンドウのアイコンは Windows 版の .ico
+- 開発用: `WebcamFbt --screenshot <フォルダ>` で 4 つのタブの画面を PNG に保存して終了する（CI で Mac での見た目を撮る）
 - データの置き場所: `~/Library/Application Support/WebcamFbt`（.NET の LocalApplicationData。モデル・設定・error.log）
 - バックグラウンド: Quest で遊ぶ間、Mac のアプリは裏に回って放置される。カメラ・推論・OSC は UI と別スレッドなので止まらないが、
   macOS の省電力で止まらないよう 2 段構えにしている
@@ -76,7 +88,7 @@ Windows の ZipArchive は Unix の実行権限を残せないので、スクリ
 
 ## 友達の Mac での確認手順
 
-### M1: 映像＋骨格の表示
+### 全機能（Windows 版と同じ機能）
 
 用意: Mac 本体（内蔵カメラで可）と、`WebcamFbt-<版>-mac.pkg`（Apple Silicon / Intel 両方入り）。
 
@@ -84,7 +96,8 @@ Windows の ZipArchive は Unix の実行権限を残せないので、スクリ
 2. .pkg をダブルクリックしてインストールする（「開けません」と出たら右クリック →「開く」、または システム設定 →
    プライバシーとセキュリティ →「このまま開く」）。終わったらアプリケーションフォルダの WebcamFbt を開く
    - 確認: インストーラが途中で Rosetta を求めたり、エラーで止まったりしない
-   - 確認: ウィンドウが開き、右にタブ（カメラ／トラッキング／校正／VRChat）、左に「「開始」を押すとカメラ映像が表示されます」
+   - 確認: Dock とアプリケーションフォルダに WebcamFbt のアイコンが出る
+   - 確認: ウィンドウが開き、右上に手順ガイド（1〜4）、その下にタブ（カメラ／トラッキング／校正／VRChat）
 3. 「開始」を押す（初回はモデルのダウンロードと CoreML の準備で 1 分ほどかかることがある）
    - 確認: カメラの許可を求めるダイアログが出る → 「許可」
    - 映像が出ないときは「停止」→「開始」をもう一度
@@ -98,5 +111,16 @@ Windows の ZipArchive は Unix の実行権限を残せないので、スクリ
    - 確認: 戻ったときに映像が動き続けている。ターミナルで `pmset -g assertions | grep -i webcamfbt` を打つと
      WebcamFbt の行が出る（実行中だけ。「停止」すると消える）
 
-送ってほしいもの: 手順 1・4・5・7・8 の控え、画面のスクリーンショット（command + shift + 4 → スペース → ウィンドウをクリック）、
+9. トラッキング: 開始して全身を映し、左下に腰・左足・右足・頭の状態（色付きの点）と座標、右下に上から見た図が出るか
+10. 体のキャリブレーション: 「トラッキング」タブで身長を合わせ、T ポーズで「キャリブレーション開始」→「キャリブレーション済み」と出るか
+11. Quest に送る: Quest と Mac を同じ Wi-Fi にし、Quest の IP（Quest の 設定 → Wi-Fi → つないでいるネットワーク → 詳細）を
+    「VRChat」タブの送信先に入れて「反映」。Quest の VRChat で アクションメニュー → オプション → OSC → 有効、
+    続けて トラッキング → OSC トラッカー（キャリブレーション）を行い、腰・足が動くか。「向きを合わせる」も試す
+    - 確認: 左下の「OSC」が緑で、送信先が Quest の IP になっている
+12. 閉じても動き続けるか: 実行中に赤い丸（閉じる）を押す → Quest の足が動き続ける → メニューバー（右上）の
+    WebcamFbt のアイコン →「表示」で画面が戻る。「終了」または command + Q で終了する
+13. 設定の保存: 送信先・身長・キャリブレーションをした後に終了 → もう一度開いて、同じ値が入っているか
+14. （カメラが 2 台あれば）「カメラを2台使う」をオンにして 2 つの映像が出るか、「校正」タブでチェッカーボードの校正ができるか
+
+送ってほしいもの: 手順 1・4・5・7・8・9〜13 の控え、画面のスクリーンショット（command + shift + 4 → スペース → ウィンドウをクリック）、
 うまくいかなかったときは `~/Library/Application Support/WebcamFbt/error.log`。

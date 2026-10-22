@@ -44,6 +44,8 @@ for ARCH in arm64 x64; do
     mkdir -p "$APP/Contents/MacOS"
     cp -R "$PUBLISH/." "$APP/Contents/MacOS/"
     sed "s/\$(VERSION)/$VERSION/g" "$PACKAGING/Info.plist" > "$APP/Contents/Info.plist"
+    mkdir -p "$APP/Contents/Resources"
+    cp "$ROOT/src/WebcamFbt.Mac/Assets/WebcamFbt.icns" "$APP/Contents/Resources/WebcamFbt.icns"
     plutil -lint "$APP/Contents/Info.plist"
 
     # Intel 版 OpenCV が参照する Homebrew の libavif（使わない）を、無くても読み込めるようにする

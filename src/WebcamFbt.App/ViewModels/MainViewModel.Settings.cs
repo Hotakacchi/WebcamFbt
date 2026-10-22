@@ -1,10 +1,15 @@
+// Mac 版（WebcamFbt.Mac）からも同じファイルをコンパイルして共有している。WPF の型（System.Windows.*）を使わないこと。
 using System.ComponentModel;
 using System.IO;
-using System.Windows.Threading;
 using WebcamFbt.Core.Persistence;
 using WebcamFbt.Core.Tracking;
 using WebcamFbt.Vision.Camera;
 using WebcamFbt.Vision.Inference;
+#if WINDOWS
+using System.Windows.Threading;
+#else
+using Avalonia.Threading; // Mac 版。DispatcherTimer の使い方は WPF と同じ
+#endif
 
 namespace WebcamFbt.App.ViewModels;
 

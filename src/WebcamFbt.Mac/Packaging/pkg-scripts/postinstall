@@ -5,5 +5,7 @@
 APP="$2/WebcamFbt.app"
 if [ -d "$APP" ]; then
     xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+    # Finder や Dock が前の版（アイコンが無かった版）の見た目を覚えたままにならないよう、更新したことを知らせる
+    touch "$APP"
 fi
 exit 0

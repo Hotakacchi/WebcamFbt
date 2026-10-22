@@ -95,6 +95,7 @@ foreach ($rid in $Rids) {
             $mode = if ($_.Extension -eq '' -or $_.Extension -eq '.dylib') { 0x1ED } else { 0x1A4 }
             Add-ZipFile $zip $_.FullName "WebcamFbt.app/Contents/MacOS/$rel" $mode
         }
+        Add-ZipFile $zip (Join-Path $macProject 'Assets\WebcamFbt.icns') 'WebcamFbt.app/Contents/Resources/WebcamFbt.icns' 0x1A4
         Add-ZipFile $zip $readme 'はじめにお読みください.txt' 0x1A4
     }
     finally {

@@ -4,6 +4,7 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OpenCvSharp;
+using WebcamFbt.Mac;
 using WebcamFbt.Mac.Platform;
 using WebcamFbt.Mac.Rendering;
 using WebcamFbt.Vision.Camera;
@@ -11,7 +12,9 @@ using WebcamFbt.Vision.Inference;
 using WebcamFbt.Vision.Models;
 using WebcamFbt.Vision.Pipeline;
 
-namespace WebcamFbt.Mac.ViewModels;
+// 名前空間は Windows 版と同じにする。トラッキング・校正・手順ガイド・設定の保存の partial ファイルは
+// Windows 版（src/WebcamFbt.App/ViewModels）のものをそのままコンパイルして共有するため（WebcamFbt.Mac.csproj を参照）。
+namespace WebcamFbt.App.ViewModels;
 
 /// <summary>選択肢（表示名と値の組）。</summary>
 public sealed record Choice<T>(string Label, T Value)
@@ -20,9 +23,10 @@ public sealed record Choice<T>(string Label, T Value)
 }
 
 /// <summary>
-/// メイン画面の ViewModel（カメラ・推論・プレビュー部分）。
-/// Windows 版（WebcamFbt.App の MainViewModel.cs）を Avalonia 向けに写したもの。
-/// 項目名・文言はできるだけ Windows 版とそろえる。
+/// Mac 版のメイン画面の ViewModel（カメラ・推論・プレビュー部分）。
+/// Windows 版（WebcamFbt.App の MainViewModel.cs）を Avalonia 向けに写したもの。項目名・文言は Windows 版とそろえる。
+/// Windows 版との違い: プレビューの画像（Avalonia の Bitmap）、取得方式（AVFoundation のみ）、推論（CoreML）、
+/// 実行中のスリープ防止、エラーのログファイル。
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
@@ -49,7 +53,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<Choice<int>> FpsChoices { get; } = [new("30 fps", 30), new("60 fps", 60)];
 
-    // Mac の取得方式は AVFoundation だけ（Windows 版と画面をそろえるため選択肢として見せる）
+    // Mac の取得方式は AVFoundation だけ（Windows 版と画面をそろえるため選択肢として見せる。値は使わない）
     public ObservableCollection<Choice<CameraBackend>> BackendChoices { get; } =
     [
         new("AVFoundation", CameraBackend.MediaFoundation),
@@ -79,7 +83,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _status = "停止中";
     [ObservableProperty] private string _statsText = "";
     [ObservableProperty] private double _progress;
-    [ObservableProperty] private int _selectedSettingsTab;
 
     public string StartStopLabel => IsRunning ? "停止" : "開始";
     public bool CanEditSettings => !IsRunning && !IsBusy;
@@ -87,6 +90,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public MainViewModel()
     {
         _selectedCamera = CameraChoices[0];
+        _selectedCamera2 = CameraChoices.Count > 1 ? CameraChoices[1] : CameraChoices[0];
         _selectedResolution = ResolutionChoices[1];
         // Mac の内蔵カメラ（FaceTime HD）は 30fps までのものが多い
         _selectedFps = FpsChoices[0];
@@ -98,12 +102,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _previewTimer.Tick += (_, _) => UpdatePreview();
         _statsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _statsTimer.Tick += (_, _) => UpdateStats();
+
+        InitializeSettings();
     }
 
     partial void OnIsRunningChanged(bool value)
     {
         OnPropertyChanged(nameof(StartStopLabel));
         OnPropertyChanged(nameof(CanEditSettings));
+        UpdateGuide();
 
         // 実行中は Mac がスリープしたり App Nap で減速したりしないようにする（Quest で遊ぶ間は Mac を触らないため）
         if (value) _sleepBlocker.Begin("WebcamFbt: カメラでトラッキングして VRChat に送信中");
@@ -115,12 +122,35 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnScoreThresholdChanged(double value)
     {
         if (_pipeline != null) _pipeline.DrawScoreThreshold = (float)value;
+        if (_pipeline2 != null) _pipeline2.DrawScoreThreshold = (float)value;
     }
 
     partial void OnPreviewEnabledChanged(bool value)
     {
-        if (_pipeline != null) _pipeline.PreviewEnabled = value;
-        if (!value) PreviewImage = null;
+        ApplyPreviewEnabled();
+        if (!value) { PreviewImage = null; PreviewImage2 = null; }
+    }
+
+    /// <summary>ウィンドウを閉じて裏で動いている間など、プレビューを一時的に止めているか（設定は変えない）。</summary>
+    private bool _previewSuspended;
+
+    /// <summary>実際にプレビューを作るか（設定がオンで、一時的に止めていないとき）。</summary>
+    private bool EffectivePreview => PreviewEnabled && !_previewSuspended;
+
+    /// <summary>
+    /// プレビューを一時的に止める・再開する（ウィンドウが見えなくなった・見えるようになったとき）。
+    /// 見えない映像の描画とコピーを省いて負荷を減らす。トラッキングと OSC の送信は続く。
+    /// </summary>
+    public void SuspendPreview(bool suspended)
+    {
+        _previewSuspended = suspended;
+        ApplyPreviewEnabled();
+    }
+
+    private void ApplyPreviewEnabled()
+    {
+        if (_pipeline != null) _pipeline.PreviewEnabled = EffectivePreview;
+        if (_pipeline2 != null) _pipeline2.PreviewEnabled = EffectivePreview;
     }
 
     // 準備中にもう一度押して中止できるよう、同時実行を許可する
@@ -176,9 +206,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var pipeline = new SingleCameraPipeline(camera, _estimator)
             {
                 DrawScoreThreshold = (float)ScoreThreshold,
-                PreviewEnabled = PreviewEnabled,
+                PreviewEnabled = EffectivePreview,
             };
             pipeline.Error += msg => PostStatus(msg);
+            StartTracking(pipeline);
 
             try
             {
@@ -188,6 +219,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             catch
             {
                 pipeline.Dispose();
+                StopTracking();
                 throw;
             }
 
@@ -196,6 +228,27 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var fmt = camera.ActualFormat;
             Status = $"実行中（カメラ {settings.DeviceIndex}: {fmt.Width}×{fmt.Height} @ {fmt.Fps:F0}fps）";
 
+            if (TwoCameraMode)
+            {
+                try
+                {
+                    await StartSecondCameraAsync(device, progress, _startCts.Token);
+                    Status = $"実行中（2 台: カメラ {settings.DeviceIndex} + {SelectedCamera2.Value}）";
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    CrashLog.Write($"カメラ 2 の開始に失敗: {ex}");
+                    StopPipeline();
+                    Status = $"カメラ 2 を開始できませんでした: {ex.Message}";
+                    return;
+                }
+            }
+
+            LoadCameraCalibration(settings.DeviceIndex, fmt.Width, fmt.Height);
             _previewTimer.Start();
             _statsTimer.Start();
         }
@@ -222,8 +275,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         _previewTimer.Stop();
         _statsTimer.Stop();
+        ResetCameraCalibrationView();
         _pipeline?.Dispose();
         _pipeline = null;
+        StopSecondCamera();
+        StopTracking();
         IsRunning = false;
         Status = "停止中";
     }
@@ -235,6 +291,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void UpdatePreview()
     {
+        UpdatePreview2();
+
+        // 上から見た図は画面の更新に合わせて描き直す（新しいトラッカーの結果が来たときだけ）
+        var trackerFrame = _lastTrackerFrame;
+        if (!ReferenceEquals(trackerFrame, TopDownFrame)) TopDownFrame = trackerFrame;
+
         var preview = _pipeline?.Preview.TryTake();
         if (preview == null) return;
         using (preview)
@@ -262,13 +324,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             $"遅延    {s.LatencyMs,5:F1} ms   (取得→推論完了)\n" +
             $"実行    {s.Provider}\n" +
             $"人物    {(s.PersonFound ? "検出中" : "見つかりません")}";
+        UpdateTrackingText();
+        UpdateStats2();
+        UpdateCameraCalibration();
+        UpdateGuide();
     }
 
     public void Dispose()
     {
+        SaveSettingsNow();
         StopPipeline();
         _estimator?.Dispose();
         _estimator = null;
+        _estimator2?.Dispose();
+        _estimator2 = null;
+        _osc.Dispose();
         _previewBitmap.Dispose();
+        _previewBitmap2.Dispose();
     }
 }
