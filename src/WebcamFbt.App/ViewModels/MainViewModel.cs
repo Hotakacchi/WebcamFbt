@@ -258,6 +258,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         _previewTimer.Stop();
         _statsTimer.Stop();
+        StopRecordingCore();
         ResetCameraCalibrationView();
         _pipeline?.Dispose();
         _pipeline = null;

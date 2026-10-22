@@ -373,6 +373,40 @@
                                    FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="12"
                                    TextWrapping="Wrap" Margin="0,8,0,0" />
 
+                        <TextBlock Text="診断用の記録（不具合の報告用）" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Text="おかしな動きが出るときに使います。30 秒ぶん、関節の位置と計算結果をファイルに記録します（映像は記録しません）。記録中に、症状が出る動きをしてください。"
+                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                        <TextBlock Text="何をしたか（例: 右足を上げて下ろす）" Style="{StaticResource Label}" />
+                        <TextBox Text="{Binding RecordingNote, UpdateSourceTrigger=PropertyChanged}" Height="24" VerticalContentAlignment="Center" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <!-- 「開始」していないとき・記録中は押せない -->
+                            <Button Grid.Column="0" Content="記録開始" Command="{Binding StartRecordingCommand}" Height="30">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsRunning}" Value="False">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsRecording}" Value="True">
+                                                <Setter Property="IsEnabled" Value="False" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button Grid.Column="1" Content="停止" Command="{Binding StopRecordingCommand}"
+                                    IsEnabled="{Binding IsRecording}" Height="30" Margin="4,0,0,0" Padding="12,0" />
+                            <Button Grid.Column="2" Content="フォルダを開く" Command="{Binding OpenRecordingsFolderCommand}"
+                                    Height="30" Margin="4,0,0,0" Padding="8,0" />
+                        </Grid>
+                        <TextBlock Text="{Binding RecordingText}" Foreground="{StaticResource TextBrush}" FontSize="11"
+                                   TextWrapping="Wrap" Margin="0,6,0,0" />
+
                         <Expander Header="詳細: 平滑化（One Euro Filter）" Foreground="{StaticResource TextBrush}" Margin="0,16,0,0">
                         <StackPanel>
                         <TextBlock Text="min cutoff を下げる → 静止時のブレが減る（遅れる）&#x0a;beta を上げる → 速い動きの遅れが減る（ブレやすい）"

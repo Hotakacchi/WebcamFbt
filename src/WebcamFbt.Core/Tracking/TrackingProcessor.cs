@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
+using WebcamFbt.Core.Diagnostics;
 using WebcamFbt.Core.Geometry;
 using WebcamFbt.Core.Pose;
 
@@ -53,6 +54,17 @@ public sealed class TrackingProcessor
         private set => _stereoProblem = value;
     }
     private volatile string? _stereoProblem;
+
+    /// <summary>
+    /// 設定されている間は、1 フレームごとに入力の 2D と計算結果を渡す（診断用の記録）。
+    /// 推論スレッドから呼ばれる。UI スレッドから差し替えるので volatile。
+    /// </summary>
+    public Action<TrackingSample>? Sampler
+    {
+        get => _sampler;
+        set => _sampler = value;
+    }
+    private volatile Action<TrackingSample>? _sampler;
 
     /// <summary>直近の <see cref="ProcessStereo"/> の品質の目安（精度確認の表示用。三角測量しなかったときは null）。</summary>
     public StereoStats? LastStereoStats
@@ -136,6 +148,7 @@ public sealed class TrackingProcessor
     public TrackerFrame? Process(Pose2D? pose, KeypointLayout layout, long capturedTimestamp, int imageWidth, int imageHeight)
     {
         ApplyPendingReset();
+        var input = pose; // 診断用の記録には、歪み補正の前の推定を残す
         double time = capturedTimestamp / (double)Stopwatch.Frequency;
         var s = Settings;
 
@@ -151,7 +164,9 @@ public sealed class TrackingProcessor
         _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
         var pose3D = _lifter.Lift(points, layout, camera, _toTracking, s, Body, time);
-        return pose3D is null ? null : Finish(pose3D, time, capturedTimestamp, stereo: false);
+        var frame = pose3D is null ? null : Finish(pose3D, time, capturedTimestamp, stereo: false);
+        _sampler?.Invoke(new TrackingSample(false, capturedTimestamp, imageWidth, imageHeight, input, 0, 0, 0, null, pose3D, frame));
+        return frame;
     }
 
     /// <summary>
@@ -161,6 +176,17 @@ public sealed class TrackingProcessor
     /// <param name="view2">カメラ 2 の推定結果（撮影時刻が近いもの）。</param>
     public TrackerFrame? ProcessStereo(StereoView view1, StereoView view2, KeypointLayout layout)
     {
+        var frame = ProcessStereoCore(view1, view2, layout, out var pose3D);
+        _sampler?.Invoke(new TrackingSample(true,
+            view1.CapturedTimestamp, view1.ImageWidth, view1.ImageHeight, view1.Pose,
+            view2.CapturedTimestamp, view2.ImageWidth, view2.ImageHeight, view2.Pose,
+            pose3D, frame));
+        return frame;
+    }
+
+    private TrackerFrame? ProcessStereoCore(StereoView view1, StereoView view2, KeypointLayout layout, out Pose3D? pose3D)
+    {
+        pose3D = null;
         ApplyPendingReset();
         var s = Settings;
         var stereo = _stereo;
@@ -184,7 +210,7 @@ public sealed class TrackingProcessor
         var points2 = _gate2.Apply(view2.Pose, layout.Count, time, s.KeypointScoreThreshold, s.KeypointHoldSeconds);
         _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
-        var pose3D = StereoTriangulator.Triangulate(points1, points2, layout, stereo, _toTracking, s.StereoMaxReprojErrorPx, out var stats);
+        pose3D = StereoTriangulator.Triangulate(points1, points2, layout, stereo, _toTracking, s.StereoMaxReprojErrorPx, out var stats);
         LastStereoStats = stats;
         if (pose3D is null)
         {
