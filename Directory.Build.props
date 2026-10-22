@@ -10,6 +10,6 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Company>WebcamFbt</Company>
     <Product>WebcamFbt</Product>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
   </PropertyGroup>
 </Project>
