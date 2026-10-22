@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/WebcamFbt.App/WebcamFbt.App.csproj" />
     <Project Path="src/WebcamFbt.Core/WebcamFbt.Core.csproj" />
+    <Project Path="src/WebcamFbt.Mac/WebcamFbt.Mac.csproj" />
     <Project Path="src/WebcamFbt.Osc/WebcamFbt.Osc.csproj" />
     <Project Path="src/WebcamFbt.Vision/WebcamFbt.Vision.csproj" />
   </Folder>

@@ -1,0 +1,104 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:WebcamFbt.Mac.ViewModels"
+        x:Class="WebcamFbt.Mac.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="WebcamFbt - Webカメラ フルボディトラッキング"
+        Width="1280" Height="760" MinWidth="900" MinHeight="560"
+        Background="#FF121316">
+    <!-- 並びと文言は Windows 版（WebcamFbt.App/Views/MainWindow.xaml）にそろえる -->
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+
+    <Grid ColumnDefinitions="*,330">
+
+        <!-- プレビュー -->
+        <Grid Grid.Column="0" Margin="12">
+            <Border Background="Black" CornerRadius="6" ClipToBounds="True">
+                <Image Source="{Binding PreviewImage}" Stretch="Uniform"
+                       RenderOptions.BitmapInterpolationMode="LowQuality" />
+            </Border>
+            <TextBlock Text="「開始」を押すとカメラ映像が表示されます"
+                       Foreground="{StaticResource SubTextBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsVisible="{Binding PreviewImage, Converter={x:Static ObjectConverters.IsNull}}" />
+            <!-- 統計情報（左上に重ねて表示） -->
+            <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
+                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10"
+                    IsVisible="{Binding StatsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
+                           FontFamily="{StaticResource MonoFont}" FontSize="13" />
+            </Border>
+        </Grid>
+
+        <!-- 設定パネル -->
+        <Border Grid.Column="1" Background="{StaticResource PanelBrush}">
+            <DockPanel Margin="16,8,16,16">
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Panel Height="4" Margin="0,0,0,8">
+                        <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" MinHeight="4" Height="4"
+                                     IsVisible="{Binding IsBusy}" />
+                    </Panel>
+                    <TextBlock Text="{Binding Status}" Foreground="{StaticResource SubTextBrush}"
+                               TextWrapping="Wrap" Margin="0,0,0,10" />
+                    <Button Classes="Primary" Content="{Binding StartStopLabel}" Command="{Binding StartStopCommand}"
+                            Height="40" FontSize="15" />
+                </StackPanel>
+
+                <TabControl SelectedIndex="{Binding SelectedSettingsTab}" Padding="0,4,0,0">
+                    <!-- ===== カメラ ===== -->
+                    <TabItem Header="カメラ">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="0,0,6,0">
+                                <TextBlock Text="カメラ" Classes="SectionHeader" />
+                                <StackPanel IsEnabled="{Binding CanEditSettings}">
+                                    <TextBlock Text="デバイス" Classes="Label" />
+                                    <ComboBox ItemsSource="{Binding CameraChoices}" SelectedItem="{Binding SelectedCamera}" />
+                                    <TextBlock Text="解像度" Classes="Label" />
+                                    <ComboBox ItemsSource="{Binding ResolutionChoices}" SelectedItem="{Binding SelectedResolution}" />
+                                    <TextBlock Text="フレームレート" Classes="Label" />
+                                    <ComboBox ItemsSource="{Binding FpsChoices}" SelectedItem="{Binding SelectedFps}" />
+                                    <TextBlock Text="取得方式" Classes="Label" />
+                                    <ComboBox ItemsSource="{Binding BackendChoices}" SelectedItem="{Binding SelectedBackend}" />
+                                </StackPanel>
+
+                                <TextBlock Text="推論" Classes="SectionHeader" />
+                                <StackPanel IsEnabled="{Binding CanEditSettings}">
+                                    <TextBlock Text="実行デバイス" Classes="Label" />
+                                    <ComboBox ItemsSource="{Binding DeviceChoices}" SelectedItem="{Binding SelectedDevice}" />
+                                </StackPanel>
+
+                                <TextBlock Text="表示" Classes="SectionHeader" />
+                                <TextBlock Classes="Label">
+                                    <Run Text="信頼度のしきい値: " /><Run Text="{Binding ScoreThreshold, StringFormat=F2}" />
+                                </TextBlock>
+                                <Slider Minimum="0" Maximum="1" SmallChange="0.05" LargeChange="0.1"
+                                        Value="{Binding ScoreThreshold}" />
+                                <CheckBox Content="左右反転して表示（鏡モード）" IsChecked="{Binding MirrorPreview}"
+                                          Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
+                                <CheckBox Content="プレビューを表示（オフで少し軽くなる）" IsChecked="{Binding PreviewEnabled}"
+                                          Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- ===== トラッキング（M2 で移植） ===== -->
+                    <TabItem Header="トラッキング">
+                        <TextBlock Text="Mac 版では次の段階で対応します。" Classes="Label" TextWrapping="Wrap" />
+                    </TabItem>
+
+                    <!-- ===== 校正（M3 で移植） ===== -->
+                    <TabItem Header="校正">
+                        <TextBlock Text="Mac 版では次の段階で対応します。" Classes="Label" TextWrapping="Wrap" />
+                    </TabItem>
+
+                    <!-- ===== VRChat（M2 で移植） ===== -->
+                    <TabItem Header="VRChat">
+                        <TextBlock Text="Mac 版では次の段階で対応します。" Classes="Label" TextWrapping="Wrap" />
+                    </TabItem>
+                </TabControl>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

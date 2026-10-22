@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Mac 版（Avalonia）。Windows 版（WebcamFbt.App、WPF）とは別のアプリで、Core・Osc・Vision を共有する。
+    配布用の .app は scripts\build-mac.ps1 で osx-arm64 / osx-x64 ごとに作る。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>WebcamFbt</AssemblyName>
+    <RootNamespace>WebcamFbt.Mac</RootNamespace>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <!--
+    開発用: Windows で `dotnet run` して画面と処理の流れを確かめるときだけ、Windows 版の OpenCV を足す
+    （Vision の net10.0 向けは macOS 版の OpenCV しか持たないため）。配布ビルド（osx-*）には入らない。
+  -->
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT' and !$(RuntimeIdentifier.StartsWith('osx'))">
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WebcamFbt.Core\WebcamFbt.Core.csproj" />
+    <ProjectReference Include="..\WebcamFbt.Osc\WebcamFbt.Osc.csproj" />
+    <ProjectReference Include="..\WebcamFbt.Vision\WebcamFbt.Vision.csproj" />
+  </ItemGroup>
+</Project>

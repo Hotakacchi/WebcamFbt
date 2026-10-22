@@ -1,0 +1,9 @@
+#!/bin/sh
+# インストールの後に、「インターネットから入手したもの」の印（quarantine）が付いていれば外す。
+# 署名（ad-hoc）はビルド時に済ませてあるので、ここではしない。
+# $2 = インストール先（/Applications）
+APP="$2/WebcamFbt.app"
+if [ -d "$APP" ]; then
+    xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+fi
+exit 0

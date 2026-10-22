@@ -1,15 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!-- カメラ入力・ONNX推論・描画など、OpenCvSharp と ONNX Runtime に依存する部分 -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!--
+      net10.0-windows: Windows 版（WPF）用。DirectML で推論する。
+      net10.0: Mac 版（Avalonia）用。CoreML か CPU で推論する。
+    -->
+    <TargetFrameworks>net10.0-windows;net10.0</TargetFrameworks>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
     <!-- DirectML 版パッケージには CPU 実行プロバイダーも含まれる -->
     <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
-    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
     <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <!--
+      CoreML 実行プロバイダー入りの macOS 版を含む。1.24 以降は Intel Mac（osx-x64）のネイティブが
+      入っていないので、Apple Silicon と Intel の両方がそろう 1.23.2 を使う。
+    -->
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.23.2" />
+    <!-- 公式の macOS 版 OpenCV。カメラ取得（AVFoundation）と校正（calib3d）も入っている -->
+    <PackageReference Include="OpenCvSharp4.runtime.osx.arm64" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.runtime.osx.x64" Version="4.13.0.20260627" />
   </ItemGroup>
 
   <ItemGroup>

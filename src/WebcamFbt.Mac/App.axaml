@@ -1,0 +1,61 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="WebcamFbt.Mac.App"
+             Name="WebcamFbt"
+             RequestedThemeVariant="Dark">
+    <!-- 色と文字の大きさは Windows 版（WebcamFbt.App/App.xaml）にそろえる -->
+    <Application.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#FF1E1F24" />
+        <SolidColorBrush x:Key="TextBrush" Color="#FFE6E6E6" />
+        <SolidColorBrush x:Key="SubTextBrush" Color="#FF9AA0AA" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF1E6FEB" />
+        <SolidColorBrush x:Key="CardBrush" Color="#FF26272D" />
+        <SolidColorBrush x:Key="GoodBrush" Color="#FF4CC46A" />
+        <SolidColorBrush x:Key="WarnBrush" Color="#FFE8B33C" />
+        <SolidColorBrush x:Key="BadBrush" Color="#FFE5534B" />
+        <SolidColorBrush x:Key="OffBrush" Color="#FF5A5F68" />
+        <!-- 等幅の統計表示（Windows 版の Consolas / BIZ UDGothic に相当） -->
+        <FontFamily x:Key="MonoFont">Menlo, Hiragino Sans, $Default</FontFamily>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+
+        <Style Selector="Window">
+            <Setter Property="FontFamily" Value="Hiragino Sans, Hiragino Kaku Gothic ProN, $Default" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style Selector="TextBlock.Label">
+            <Setter Property="Foreground" Value="{StaticResource SubTextBrush}" />
+            <Setter Property="Margin" Value="0,10,0,3" />
+        </Style>
+        <Style Selector="TextBlock.SectionHeader">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,16,0,2" />
+        </Style>
+        <Style Selector="ComboBox">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style Selector="Button.Primary">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <!-- 設定パネルのタブ（Windows 版と同じく小さめの見出し。選択中は下に線） -->
+        <Style Selector="TabItem">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Foreground" Value="{StaticResource SubTextBrush}" />
+        </Style>
+        <Style Selector="TabItem:selected">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style Selector="TabItem:selected /template/ Border#PART_SelectedPipe">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+        </Style>
+    </Application.Styles>
+</Application>

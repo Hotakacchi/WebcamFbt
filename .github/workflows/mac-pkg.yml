@@ -1,0 +1,81 @@
+# Mac 版のインストーラ（.pkg）を macOS ランナーで作り、動くかを自動で確かめる。
+# できた .pkg は、この実行の「Artifacts」から WebcamFbt-mac-pkg としてダウンロードできる。
+#
+# 動かすタイミング: 手動（Actions タブ → Mac 版インストーラ → Run workflow）と v* タグの push。
+# v* タグのときは、同じ名前の GitHub Release に .pkg を載せる（Release が無ければ作らずに失敗する）。
+# 非公開リポジトリでは macOS ランナーの時間は 10 倍で数えられるので、push のたびには動かさない。
+name: Mac 版インストーラ
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  pkg:
+    # Apple Silicon のランナー。Intel 用の .app は Rosetta で自己診断する
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: write   # Release に .pkg を載せるため
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: .pkg を作る
+        run: bash scripts/build-mac-pkg.sh
+
+      - name: 自己診断（Apple Silicon 用の .app）
+        run: artifacts/mac-pkg/stage-arm64/WebcamFbt.app/Contents/MacOS/WebcamFbt --self-test
+
+      # Rosetta の上で動かす。ランナーには Intel 用の Homebrew が無いので、Homebrew への依存が残っていればここで落ちる
+      - name: 自己診断（Intel 用の .app、Rosetta で）
+        run: |
+          if ! arch -x86_64 /usr/bin/true 2>/dev/null; then
+            softwareupdate --install-rosetta --agree-to-license
+          fi
+          arch -x86_64 artifacts/mac-pkg/stage-x64/WebcamFbt.app/Contents/MacOS/WebcamFbt --self-test
+
+      - name: .pkg をインストールして確かめる
+        run: |
+          PKG="$(ls artifacts/release/WebcamFbt-*-mac.pkg)"
+          sudo installer -pkg "$PKG" -target /
+          APP=/Applications/WebcamFbt.app
+          test -x "$APP/Contents/MacOS/WebcamFbt"
+          # Apple Silicon 用が選ばれているか（ランナーは Apple Silicon）
+          file "$APP/Contents/MacOS/WebcamFbt"
+          file "$APP/Contents/MacOS/WebcamFbt" | grep -q arm64
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          "$APP/Contents/MacOS/WebcamFbt" --self-test
+
+      - name: 画面つきで起動して、すぐ落ちないか確かめる
+        continue-on-error: true
+        run: |
+          APP=/Applications/WebcamFbt.app
+          "$APP/Contents/MacOS/WebcamFbt" &
+          PID=$!
+          sleep 20
+          if kill -0 "$PID" 2>/dev/null; then
+            echo "20 秒たっても動いています（正常）"
+            kill "$PID"
+          else
+            echo "起動後に終了しました"
+            cat "$HOME/Library/Application Support/WebcamFbt/error.log" 2>/dev/null || true
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WebcamFbt-mac-pkg
+          path: artifacts/release/WebcamFbt-*-mac.pkg
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Release に載せる（v* タグのときだけ）
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${GITHUB_REF_NAME}" artifacts/release/WebcamFbt-*-mac.pkg --clobber

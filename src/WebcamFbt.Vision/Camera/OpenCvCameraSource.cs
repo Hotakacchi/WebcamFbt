@@ -41,7 +41,9 @@ public sealed class OpenCvCameraSource : IDisposable
     {
         if (_running) return;
 
-        var api = _settings.Backend == CameraBackend.DirectShow ? VideoCaptureAPIs.DSHOW : VideoCaptureAPIs.MSMF;
+        // Mac では取得 API の設定に関係なく AVFoundation を使う
+        var api = OperatingSystem.IsMacOS() ? VideoCaptureAPIs.AVFOUNDATION
+            : _settings.Backend == CameraBackend.DirectShow ? VideoCaptureAPIs.DSHOW : VideoCaptureAPIs.MSMF;
         _capture = new VideoCapture(_settings.DeviceIndex, api);
         if (!_capture.IsOpened())
         {

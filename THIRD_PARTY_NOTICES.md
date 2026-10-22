@@ -13,6 +13,19 @@ WebcamFbt は以下のライブラリとモデルを使用しています。
 | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | MVVM | MIT |
 | [.NET](https://github.com/dotnet/runtime) / [WPF](https://github.com/dotnet/wpf) | 実行環境（配布用の exe に同梱） | MIT |
 
+### Mac 版で追加で使うもの
+
+| 名前 | 用途 | ライセンス |
+|---|---|---|
+| [ONNX Runtime](https://github.com/microsoft/onnxruntime)（Microsoft.ML.OnnxRuntime 1.23.2、CoreML 実行プロバイダー入り） | 推論 | MIT |
+| [OpenCV](https://opencv.org/)（OpenCvSharp4.runtime.osx.arm64 / osx.x64 に同梱） | カメラ入力（AVFoundation）・画像処理 | Apache-2.0 |
+| 　└ 上記に静的リンクされた [FFmpeg](https://ffmpeg.org/) / [Tesseract](https://github.com/tesseract-ocr/tesseract) / [FreeType](https://freetype.org/) | （OpenCV の一部として同梱。WebcamFbt からは直接使わない） | LGPL-2.1 / Apache-2.0 / FreeType License |
+| [Avalonia](https://github.com/AvaloniaUI/Avalonia) | 画面（UI） | MIT |
+| [SkiaSharp](https://github.com/mono/SkiaSharp) / HarfBuzzSharp | 描画（Avalonia が使用） | MIT |
+| [.NET](https://github.com/dotnet/runtime) | 実行環境（.app に同梱） | MIT |
+
+FFmpeg は libOpenCvSharpExtern.dylib に含まれる形で、アプリ本体とは別のファイル（差し替え可能な動的ライブラリ）として同梱しています。
+
 ※ DirectML.dll は MIT ではなく Microsoft の使用許諾で、Windows 向けの機械学習アプリに組み込んで配布することが許可されています
 （単体での再配布は不可）。全文は [licenses/DirectML-LICENSE.txt](licenses/DirectML-LICENSE.txt)、
 DirectML が含む第三者のコンポーネントは [licenses/DirectML-ThirdPartyNotices.txt](licenses/DirectML-ThirdPartyNotices.txt) を参照してください。

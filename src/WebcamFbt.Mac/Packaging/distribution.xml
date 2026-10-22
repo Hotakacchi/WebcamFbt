@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Mac 版インストーラ（.pkg）の構成。scripts/build-mac-pkg.sh が @VERSION@ を版に置き換えて productbuild に渡す。
+  Apple Silicon 用と Intel 用の 2 つの中身を持ち、インストールする Mac のチップに合う方だけを自動で入れる
+  （友達の Mac のチップが分からなくても、1 つのファイルを渡せば済むように）。
+-->
+<installer-gui-script minSpecVersion="2">
+    <title>WebcamFbt</title>
+    <!-- hostArchitectures に arm64 が無いと、Apple Silicon で Rosetta のインストールを求められる -->
+    <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64" />
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true" />
+    <welcome file="welcome.html" mime-type="text/html" />
+    <conclusion file="conclusion.html" mime-type="text/html" />
+
+    <!-- ONNX Runtime の macOS 版が 13.4 以上を要求する -->
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="13.4" />
+        </allowed-os-versions>
+    </volume-check>
+
+    <script><![CDATA[
+    // Apple Silicon なら 1（Intel の Mac には この項目が無い）
+    function isAppleSilicon() {
+        return system.sysctl('hw.optional.arm64') == 1;
+    }
+    ]]></script>
+
+    <choices-outline>
+        <line choice="arm64" />
+        <line choice="x64" />
+    </choices-outline>
+    <choice id="arm64" title="WebcamFbt (Apple Silicon)" visible="false"
+            enabled="isAppleSilicon()" selected="isAppleSilicon()">
+        <pkg-ref id="io.github.hotakacchi.webcamfbt.arm64" />
+    </choice>
+    <choice id="x64" title="WebcamFbt (Intel)" visible="false"
+            enabled="!isAppleSilicon()" selected="!isAppleSilicon()">
+        <pkg-ref id="io.github.hotakacchi.webcamfbt.x64" />
+    </choice>
+
+    <pkg-ref id="io.github.hotakacchi.webcamfbt.arm64" version="@VERSION@" onConclusion="none">WebcamFbt-arm64.pkg</pkg-ref>
+    <pkg-ref id="io.github.hotakacchi.webcamfbt.x64" version="@VERSION@" onConclusion="none">WebcamFbt-x64.pkg</pkg-ref>
+</installer-gui-script>

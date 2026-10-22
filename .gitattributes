@@ -1,0 +1,3 @@
+# Mac 版のシェルスクリプトとインストーラのスクリプトは、Windows で取り出しても LF のままにする
+*.sh text eol=lf
+src/WebcamFbt.Mac/Packaging/pkg-scripts/* text eol=lf

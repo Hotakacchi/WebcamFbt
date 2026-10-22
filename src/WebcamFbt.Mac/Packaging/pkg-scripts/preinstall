@@ -1,0 +1,9 @@
+#!/bin/sh
+# インストールの前に、前の版の WebcamFbt.app を消す（古いファイルが残って混ざらないように）。
+# 設定やモデルは ~/Library/Application Support/WebcamFbt にあるので消えない。
+# $2 = インストール先（/Applications）
+APP="$2/WebcamFbt.app"
+if [ -d "$APP" ]; then
+    rm -rf "$APP"
+fi
+exit 0

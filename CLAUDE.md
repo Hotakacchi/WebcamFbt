@@ -71,6 +71,19 @@ dotnet run --project src\WebcamFbt.App -c Release
     .iss と .ps1 は BOM 付き UTF-8 にする。v0.1.0 を GitHub Releases にプレリリースとして公開（ステレオは実機未検証のため）。
     確認待ち: 利用者データ（settings.json など）が %LOCALAPPDATA%\WebcamFbt に保存されているか（Claude のシェルからは見えなかった）
 
+## Mac 版（Avalonia）
+
+詳細は docs/mac.md。Windows 版（WPF）は変えずに残し、`src/WebcamFbt.Mac` を足す。Core・Osc・Vision を共有。
+UI は**Windows 版とできるだけ同じ見た目にする**（ユーザー指定。並び・文言・色をそろえる）。
+ユーザーは Mac を持っていないので、確認は友達の Mac（チップ不明）で行う。ここで確かめられるのはビルドと合成データのテストまで。
+
+- [ ] M1: Vision の 2 ターゲット化（Mac は ONNX Runtime 1.23.2 + CoreML/CPU、OpenCvSharp 公式 osx ランタイムで AVFoundation）、
+  Avalonia の画面（カメラ 1 台の映像＋2D 骨格＋統計）、実行中のスリープ・App Nap 防止（`Platform/SleepBlocker`）、配布は GitHub Actions（`.github/workflows/mac-pkg.yml`、macOS ランナー）で
+  arm64/x64 両方入りの .pkg（ad-hoc 署名済み、`--self-test` とインストールの自動チェック付き）。
+  `v*` タグの push で同じ版の GitHub Release に .pkg を載せる（v0.1.0 には手で追加済み）。作業は main で行う（ユーザー指定）。実装済み・友達の Mac で確認待ち
+- [ ] M2: トラッキング＋OSC 送信（Quest の IP へ）、体のキャリブレーション、設定の保存
+- [ ] M3: タブの残り（校正・2 台）、手順ガイド・状態表示・上から見た図、README・アイコン
+
 ## 設計の要点（フェーズ2）
 
 - 座標: カメラ座標（OpenCV: +X右 +Y下 +Z奥）→ トラッキング座標（Unity: +X右 +Y上 +Z前、左手系、m）。

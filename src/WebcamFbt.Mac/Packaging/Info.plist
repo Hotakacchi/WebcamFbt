@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- WebcamFbt.app の Info.plist。scripts\build-mac.ps1 が $(VERSION) を版に置き換えて .app に入れる -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>WebcamFbt</string>
+    <key>CFBundleDisplayName</key>
+    <string>WebcamFbt</string>
+    <key>CFBundleIdentifier</key>
+    <string>io.github.hotakacchi.webcamfbt</string>
+    <key>CFBundleExecutable</key>
+    <string>WebcamFbt</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleVersion</key>
+    <string>$(VERSION)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(VERSION)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <!-- ONNX Runtime 1.23.2 の macOS 版が 13.4 以上を要求する（.NET 10 の公式サポートは 15 以降） -->
+    <key>LSMinimumSystemVersion</key>
+    <string>13.4</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <!--
+      App Nap（ウィンドウが隠れたアプリを macOS が自動で減速させる省電力機能）を止める。
+      VRChat をしている間このアプリは裏に回るので、止めないとカメラ・推論・OSC 送信が遅くなる
+    -->
+    <key>NSAppSleepDisabled</key>
+    <true/>
+    <!-- これが無いとカメラの許可を求められず、映像が取れない -->
+    <key>NSCameraUsageDescription</key>
+    <string>体の動きを読み取ってフルボディトラッキングに使うため、カメラの映像を使います（映像は外部に送りません）。</string>
+</dict>
+</plist>
