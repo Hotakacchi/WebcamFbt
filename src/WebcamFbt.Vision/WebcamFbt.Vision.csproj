@@ -7,9 +7,9 @@
 
   <ItemGroup>
     <!-- DirectML 版パッケージには CPU 実行プロバイダーも含まれる -->
-    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.*" />
-    <PackageReference Include="OpenCvSharp4" Version="4.*" />
-    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.*" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.DirectML" Version="1.24.4" />
+    <PackageReference Include="OpenCvSharp4" Version="4.13.0.20260627" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
   </ItemGroup>
 
   <ItemGroup>
