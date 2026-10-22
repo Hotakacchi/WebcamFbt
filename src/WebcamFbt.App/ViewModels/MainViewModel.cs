@@ -113,9 +113,30 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnPreviewEnabledChanged(bool value)
     {
-        if (_pipeline != null) _pipeline.PreviewEnabled = value;
-        if (_pipeline2 != null) _pipeline2.PreviewEnabled = value;
+        ApplyPreviewEnabled();
         if (!value) { PreviewImage = null; PreviewImage2 = null; }
+    }
+
+    /// <summary>ウィンドウがタスクトレイに隠れている間など、プレビューを一時的に止めているか（設定は変えない）。</summary>
+    private bool _previewSuspended;
+
+    /// <summary>実際にプレビューを作るか（設定がオンで、一時的に止めていないとき）。</summary>
+    private bool EffectivePreview => PreviewEnabled && !_previewSuspended;
+
+    /// <summary>
+    /// プレビューを一時的に止める・再開する（ウィンドウが見えなくなった・見えるようになったとき）。
+    /// 見えない映像の描画とコピーを省いて負荷を減らす。トラッキングと OSC の送信は続く。
+    /// </summary>
+    public void SuspendPreview(bool suspended)
+    {
+        _previewSuspended = suspended;
+        ApplyPreviewEnabled();
+    }
+
+    private void ApplyPreviewEnabled()
+    {
+        if (_pipeline != null) _pipeline.PreviewEnabled = EffectivePreview;
+        if (_pipeline2 != null) _pipeline2.PreviewEnabled = EffectivePreview;
     }
 
     // 準備中にもう一度押して中止できるよう、同時実行を許可する
@@ -171,7 +192,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var pipeline = new SingleCameraPipeline(camera, _estimator)
             {
                 DrawScoreThreshold = (float)ScoreThreshold,
-                PreviewEnabled = PreviewEnabled,
+                PreviewEnabled = EffectivePreview,
             };
             pipeline.Error += msg => PostStatus(msg);
             StartTracking(pipeline);

@@ -62,7 +62,7 @@ public sealed partial class MainViewModel
         var pipeline = new SingleCameraPipeline(camera, _estimator2)
         {
             DrawScoreThreshold = (float)ScoreThreshold,
-            PreviewEnabled = PreviewEnabled,
+            PreviewEnabled = EffectivePreview,
         };
         pipeline.Error += msg => PostStatus(msg);
         pipeline.PoseEstimated += OnPoseEstimated2;

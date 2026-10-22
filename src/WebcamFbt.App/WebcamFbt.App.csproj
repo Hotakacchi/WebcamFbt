@@ -3,6 +3,8 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- タスクトレイのアイコン（NotifyIcon）にだけ Windows Forms を使う -->
+    <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>WebcamFbt</AssemblyName>
     <RootNamespace>WebcamFbt.App</RootNamespace>
     <!-- Linux 等でビルドだけ確認したい場合のため -->
@@ -28,7 +30,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- ウィンドウ（タスクバー）のアイコン -->
+    <!-- Windows Forms と System.Drawing の名前空間は自動では読み込まない（WPF の Application・Color などと名前がぶつかるため） -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ウィンドウ（タスクバー）とタスクトレイのアイコン -->
     <Resource Include="Assets\WebcamFbt.ico" />
   </ItemGroup>
 
