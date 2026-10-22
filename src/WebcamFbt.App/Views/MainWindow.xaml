@@ -133,6 +133,17 @@
                         <Slider Minimum="0.1" Maximum="0.9" SmallChange="0.05" LargeChange="0.1"
                                 Value="{Binding TrackingThreshold}" />
 
+                        <TextBlock Text="キャリブレーション" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Text="カメラの方を向いて T ポーズ（全身が映る位置）で立ち、ボタンを押してください。数秒ぶん測って体の比率・床の高さ・正面方向を合わせます。"
+                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                        <Button Content="キャリブレーション開始" Command="{Binding CalibrateCommand}"
+                                Margin="0,8,0,0" Height="30" />
+                        <Button Content="解除（既定値に戻す）" Command="{Binding ClearCalibrationCommand}"
+                                Margin="0,6,0,0" Height="26" />
+                        <TextBlock Text="{Binding CalibrationText}" Foreground="{StaticResource SubTextBrush}"
+                                   FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="12"
+                                   TextWrapping="Wrap" Margin="0,8,0,0" />
+
                         <TextBlock Text="平滑化（One Euro Filter）" Style="{StaticResource SectionHeader}" />
                         <TextBlock Text="min cutoff を下げる → 静止時のブレが減る（遅れる）&#x0a;beta を上げる → 速い動きの遅れが減る（ブレやすい）"
                                    Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />

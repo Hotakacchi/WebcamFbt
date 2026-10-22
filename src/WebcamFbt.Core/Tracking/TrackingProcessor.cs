@@ -19,10 +19,65 @@ public sealed class TrackingProcessor
     public TrackingSettings Settings { get; }
     public BodyProportions Body { get; set; } = BodyProportions.Default;
 
+    /// <summary>適用中のキャリブレーション結果（未実施なら <see cref="CalibrationData.None"/>）。</summary>
+    public CalibrationData Calibration { get; private set; } = CalibrationData.None;
+
+    // キャリブレーション中の状態。UI スレッドと推論スレッドから触るので volatile。
+    private volatile Calibrator? _calibrator;
+    private volatile int _calibrationTarget;
+    private volatile bool _calibrationActive;
+    private volatile bool _calibrationSucceeded;
+    private volatile bool _calibrationFailed;
+
+    /// <summary>キャリブレーション中か。</summary>
+    public bool IsCalibrating => _calibrationActive;
+
+    /// <summary>これまでに取り込んだフレーム数。</summary>
+    public int CalibrationFrameCount => _calibrator?.FrameCount ?? 0;
+
+    /// <summary>確定までに必要なフレーム数。</summary>
+    public int CalibrationTarget => _calibrationTarget;
+
     public TrackingProcessor(TrackingSettings settings)
     {
         Settings = settings;
         _solver = new TrackerSolver(settings);
+    }
+
+    /// <summary>
+    /// キャリブレーションを開始する（UI スレッドから）。targetFrames フレーム貯めたら自動で確定する。
+    /// </summary>
+    public void BeginCalibration(int targetFrames)
+    {
+        _calibrationTarget = System.Math.Max(1, targetFrames);
+        _calibrationSucceeded = false;
+        _calibrationFailed = false;
+        _calibrator = new Calibrator();
+        _calibrationActive = true;
+    }
+
+    /// <summary>キャリブレーションを中断する。</summary>
+    public void CancelCalibration()
+    {
+        _calibrator = null;
+        _calibrationActive = false;
+    }
+
+    /// <summary>キャリブレーション結果を破棄し、既定の比率に戻す。</summary>
+    public void ClearCalibration()
+    {
+        CancelCalibration();
+        Calibration = CalibrationData.None;
+        Body = BodyProportions.Default;
+    }
+
+    /// <summary>直近のキャリブレーション完了を一度だけ受け取る（UI スレッドから。成功/失敗を返す）。</summary>
+    public bool TryTakeCalibrationResult(out bool success)
+    {
+        if (_calibrationSucceeded) { _calibrationSucceeded = false; success = true; return true; }
+        if (_calibrationFailed) { _calibrationFailed = false; success = false; return true; }
+        success = false;
+        return false;
     }
 
     /// <summary>
@@ -42,14 +97,41 @@ public sealed class TrackingProcessor
         _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
         var pose3D = _lifter.Lift(points, layout, camera, _toTracking, s, Body, time);
-        return pose3D is null ? null : _solver.Solve(pose3D, time, capturedTimestamp);
+        if (pose3D is null) return null;
+
+        // キャリブレーション中なら、この姿勢を取り込み、目標フレーム数に達したら確定する
+        var cal = _calibrator;
+        if (cal is not null)
+        {
+            cal.Add(pose3D);
+            if (cal.FrameCount >= _calibrationTarget)
+            {
+                var result = cal.Build(s.HeightMeters);
+                _calibrator = null;
+                _calibrationActive = false;
+                if (result is not null)
+                {
+                    Calibration = result;
+                    Body = result.Body;
+                    _calibrationSucceeded = true;
+                }
+                else
+                {
+                    _calibrationFailed = true;
+                }
+            }
+        }
+
+        var frame = _solver.Solve(pose3D, time, capturedTimestamp);
+        return Calibration.Apply(frame);
     }
 
-    /// <summary>平滑化などの内部状態を捨てる（開始し直すとき）。</summary>
+    /// <summary>平滑化などの内部状態を捨てる（開始し直すとき）。キャリブレーション結果は保持する。</summary>
     public void Reset()
     {
         _gate.Reset();
         _lifter.Reset();
         _solver.Reset();
+        CancelCalibration();
     }
 }

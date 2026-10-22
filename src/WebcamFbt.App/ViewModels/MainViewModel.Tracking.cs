@@ -37,6 +37,13 @@ public sealed partial class MainViewModel
     [ObservableProperty] private bool _sendHeadPosition = true;
     [ObservableProperty] private string _trackingText = "";
 
+    // ---- キャリブレーション ----
+    [ObservableProperty] private bool _isCalibrating;
+    [ObservableProperty] private string _calibrationText = "キャリブレーション: 未実施（既定値で動作）";
+
+    /// <summary>確定までに貯めるフレーム数（おおよそ 30fps で 3 秒前後）。</summary>
+    private const int CalibrationFrames = 90;
+
     partial void OnHeightMetersChanged(double value) => _trackingSettings.HeightMeters = value;
     partial void OnHorizontalFovChanged(double value) => _trackingSettings.HorizontalFovDeg = value;
     partial void OnCameraPitchChanged(double value) => _trackingSettings.CameraPitchDownDeg = value;
@@ -71,6 +78,33 @@ public sealed partial class MainViewModel
     {
         _osc.RequestYawAlign();
         Status = "向きを合わせました（カメラの方を向いた状態を正面としました）";
+    }
+
+    /// <summary>
+    /// キャリブレーションを開始する。カメラの方を向いて T ポーズで立った状態で押してもらう。
+    /// 数秒ぶん観測を貯めて、体の比率・床の高さ・正面方向を確定する。
+    /// </summary>
+    [RelayCommand]
+    private void Calibrate()
+    {
+        var tracking = _tracking;
+        if (tracking == null || !IsRunning)
+        {
+            Status = "先に「開始」を押してください";
+            return;
+        }
+        tracking.BeginCalibration(CalibrationFrames);
+        IsCalibrating = true;
+        Status = "キャリブレーション中… カメラの方を向いて T ポーズで立ってください";
+    }
+
+    /// <summary>キャリブレーション結果を破棄して既定値に戻す。</summary>
+    [RelayCommand]
+    private void ClearCalibration()
+    {
+        _tracking?.ClearCalibration();
+        IsCalibrating = false;
+        Status = "キャリブレーションを解除しました";
     }
 
     /// <summary>フィルタの値を初期値に戻す。</summary>
@@ -114,6 +148,8 @@ public sealed partial class MainViewModel
 
     private void UpdateTrackingText()
     {
+        UpdateCalibration();
+
         var frame = _lastTrackerFrame;
         var sb = new StringBuilder();
         sb.AppendLine($"OSC     {(OscEnabled ? $"{_osc.SendRate.Rate,5:F0} fps → {_osc.Endpoint}" : "送信オフ")}");
@@ -143,5 +179,41 @@ public sealed partial class MainViewModel
             sb.Append(frame.HeadValid ? $"頭       ({h.X,5:F2},{h.Y,5:F2},{h.Z,5:F2})" : "頭       見えていません");
         }
         TrackingText = sb.ToString();
+    }
+
+    /// <summary>キャリブレーションの進捗・完了・結果の表示を更新する（UI スレッド）。</summary>
+    private void UpdateCalibration()
+    {
+        var tracking = _tracking;
+        if (tracking == null) return;
+
+        if (tracking.TryTakeCalibrationResult(out bool success))
+        {
+            IsCalibrating = false;
+            Status = success
+                ? "キャリブレーション完了"
+                : "キャリブレーション失敗（体全体が映っていませんでした）";
+        }
+        if (IsCalibrating && !tracking.IsCalibrating) IsCalibrating = false;
+
+        if (tracking.IsCalibrating)
+        {
+            CalibrationText = $"キャリブレーション中… {tracking.CalibrationFrameCount}/{tracking.CalibrationTarget}";
+            return;
+        }
+
+        var cal = tracking.Calibration;
+        if (!cal.IsCalibrated)
+        {
+            CalibrationText = "キャリブレーション: 未実施（既定値で動作）";
+            return;
+        }
+
+        var b = cal.Body;
+        var sb = new StringBuilder();
+        sb.AppendLine("キャリブレーション済み");
+        if (cal.HasFloor) sb.AppendLine($"床の高さ {cal.FloorY,5:F2} m   正面補正 {cal.YawOffsetDeg,4:F0}°");
+        sb.Append($"比率 肩{b.ShoulderWidth:F2} 腰{b.HipWidth:F2} 胴{b.Torso:F2} 腿{b.Thigh:F2} すね{b.Shin:F2} 足{b.Foot:F2}");
+        CalibrationText = sb.ToString();
     }
 }
