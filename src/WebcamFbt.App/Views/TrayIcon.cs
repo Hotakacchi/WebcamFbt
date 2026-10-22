@@ -73,7 +73,7 @@ public sealed class TrayIcon : IDisposable
 
     /// <summary>マウスを乗せたときの説明（63 文字まで）。</summary>
     private void UpdateText()
-        => _icon.Text = $"WebcamFbt - {(_vm.IsBusy ? "準備中" : _vm.IsRunning ? "実行中" : "停止中")}";
+        => _icon.Text = $"{AppInfo.DisplayName} - {(_vm.IsBusy ? "準備中" : _vm.IsRunning ? "実行中" : "停止中")}";
 
     public void Dispose()
     {
