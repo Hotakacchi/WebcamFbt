@@ -100,6 +100,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(StartStopLabel));
         OnPropertyChanged(nameof(CanEditSettings));
+        UpdateGuide();
     }
 
     partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(CanEditSettings));
@@ -254,6 +255,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         UpdatePreview2();
 
+        // 上から見た図は画面の更新に合わせて描き直す（新しいトラッカーの結果が来たときだけ）
+        var trackerFrame = _lastTrackerFrame;
+        if (!ReferenceEquals(trackerFrame, TopDownFrame)) TopDownFrame = trackerFrame;
+
         var preview = _pipeline?.Preview.TryTake();
         if (preview == null) return;
         using (preview)
@@ -292,6 +297,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         UpdateTrackingText();
         UpdateStats2();
         UpdateCameraCalibration();
+        UpdateGuide();
     }
 
     public void Dispose()

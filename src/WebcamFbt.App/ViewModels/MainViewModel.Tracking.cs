@@ -122,6 +122,7 @@ public sealed partial class MainViewModel
         CalibrationText = DescribeBodyCalibration(CalibrationData.None);
         Status = "キャリブレーションを解除しました";
         MarkSettingsDirty();
+        UpdateGuide();
     }
 
     /// <summary>フィルタの値を初期値に戻す。</summary>
@@ -153,6 +154,7 @@ public sealed partial class MainViewModel
         _stereoMatcher.Reset();
         _lastTrackerFrame = null;
         TrackingText = "";
+        ResetIndicators();
     }
 
     partial void OnUseStereoTrackingChanged(bool value) => UpdateTrackingMode();
@@ -216,6 +218,7 @@ public sealed partial class MainViewModel
         UpdateCalibration();
 
         var frame = _lastTrackerFrame;
+        UpdateIndicators(frame);
         var sb = new StringBuilder();
         sb.AppendLine($"OSC     {(OscEnabled ? $"{_osc.SendRate.Rate,5:F0} fps → {_osc.Endpoint}" : "送信オフ")}");
         if (_osc.LastError != null) sb.AppendLine($"OSC エラー: {_osc.LastError}");

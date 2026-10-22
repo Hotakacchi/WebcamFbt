@@ -52,6 +52,7 @@ public sealed partial class MainViewModel
             _loadingSettings = false;
         }
         PropertyChanged += OnSettingPropertyChanged;
+        UpdateGuide();
     }
 
     /// <summary>
@@ -150,7 +151,10 @@ public sealed partial class MainViewModel
 
     private void OnSettingPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is { } name && PersistedProperties.Contains(name)) MarkSettingsDirty();
+        if (e.PropertyName is not { } name || !PersistedProperties.Contains(name)) return;
+        MarkSettingsDirty();
+        // 開始前にカメラや解像度を変えたら、手順ガイドの「カメラの校正」の済み・未を見直す
+        if (!IsRunning) UpdateGuide();
     }
 
     /// <summary>設定が変わったことを記録し、少し待ってから保存する（スライダーを動かしている間に何度も書かないため）。</summary>

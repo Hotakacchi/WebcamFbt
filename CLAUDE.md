@@ -62,6 +62,11 @@ dotnet run --project src\WebcamFbt.App -c Release
     画面の設定＋体のキャリブレーション結果を保存し、起動時に復元。変更の 1 秒後と終了時に保存。
     OSC の送信先は「反映」に成功したものだけ保存。保存対象を増やすときは `AppSettings`・`PersistedProperties`・
     `ApplySettings`・`BuildSettings` の 4 か所に足す
+  - [x] 5b: 実装・コミット済み（ユーザー確認済み）。右パネルを「カメラ／トラッキング／校正／VRChat」のタブに分割
+    （タブ番号は MainViewModel.Guide.cs の定数と XAML の並びをそろえる）、手順ガイド（済み✓・次を強調・押すとタブ移動）、
+    腰・両足・頭・OSC の色付き状態表示、上から見たトラッカーの図（`Views/TrackerTopDownView`）
+  - 5c で決めること: 単一 exe に加えて Inno Setup のインストーラも作るか（ユーザーがインストーラに関心あり）。
+    未署名 exe は SmartScreen の警告が出るので README で案内する
 
 ## 設計の要点（フェーズ2）
 
