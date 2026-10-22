@@ -338,6 +338,29 @@
                                            FontFamily="{StaticResource MonoFont}" FontSize="12"
                                            TextWrapping="Wrap" Margin="0,8,0,0" />
 
+                                <TextBlock Text="診断用の記録（不具合の報告用）" Classes="SectionHeader" />
+                                <TextBlock Text="おかしな動きが出るときに使います。30 秒ぶん、関節の位置と計算結果をファイルに記録します（映像は記録しません）。記録中に、症状が出る動きをしてください。"
+                                           Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                                <TextBlock Text="何をしたか（例: 右足を上げて下ろす）" Classes="Label" />
+                                <TextBox Text="{Binding RecordingNote}" />
+                                <Grid Margin="0,8,0,0" ColumnDefinitions="*,Auto,Auto">
+                                    <!-- 「開始」していないとき・記録中は押せない -->
+                                    <Button Grid.Column="0" Classes="Wide" Content="記録開始" Command="{Binding StartRecordingCommand}" Height="30">
+                                        <Button.IsEnabled>
+                                            <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                <Binding Path="IsRunning" />
+                                                <Binding Path="!IsRecording" />
+                                            </MultiBinding>
+                                        </Button.IsEnabled>
+                                    </Button>
+                                    <Button Grid.Column="1" Content="停止" Command="{Binding StopRecordingCommand}"
+                                            IsEnabled="{Binding IsRecording}" Height="30" Margin="4,0,0,0" Padding="12,0" VerticalContentAlignment="Center" />
+                                    <Button Grid.Column="2" Content="フォルダを開く" Command="{Binding OpenRecordingsFolderCommand}"
+                                            Height="30" Margin="4,0,0,0" Padding="8,0" VerticalContentAlignment="Center" />
+                                </Grid>
+                                <TextBlock Text="{Binding RecordingText}" Foreground="{StaticResource TextBrush}" FontSize="11"
+                                           TextWrapping="Wrap" Margin="0,6,0,0" />
+
                                 <Expander Header="詳細: 平滑化（One Euro Filter）" Margin="0,16,0,0" HorizontalAlignment="Stretch">
                                     <StackPanel>
                                         <TextBlock Text="min cutoff を下げる → 静止時のブレが減る（遅れる）&#x0a;beta を上げる → 速い動きの遅れが減る（ブレやすい）"
