@@ -215,7 +215,12 @@ scripts/              配布物を作るスクリプト
 
 ## ライセンス
 
-このソフトウェアのソースコードは [MIT License](LICENSE) です。
+このソフトウェアは **GNU General Public License バージョン 3 またはそれ以降（GPL-3.0-or-later）** です。全文は [LICENSE](LICENSE) にあります。
+改変したものを配布するときは、そのソースも GPL の条件で公開する必要があります。
+
+Windows 版は GPU での推論のために Microsoft の DirectML（`DirectML.dll`）を同梱しています。DirectML は GPL と両立しない
+Microsoft 独自の使用許諾なので、DirectML と組み合わせて配布することを認める追加の許可（GPLv3 第 7 条）を付けています。
+文面は [LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt) を参照してください。
 
 使用しているライブラリとモデルのライセンスは [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) を参照してください。
 **特に、姿勢推定モデルの学習データには非商用条件のデータセットが含まれます。** 詳しくは同ファイルの注意事項を読んでください。

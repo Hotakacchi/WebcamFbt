@@ -1,0 +1,55 @@
+WebcamFbt
+Copyright (C) 2026 ほたかっち
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program (see the file LICENSE).  If not, see
+<https://www.gnu.org/licenses/>.
+
+
+Additional permission under GNU GPL version 3 section 7
+
+If you modify this Program, or any covered work, by linking or combining
+it with Microsoft DirectML (or a modified version of that library),
+containing parts covered by the terms of the Microsoft Software License
+Terms for Microsoft DirectX Machine Learning (DirectML), the licensors of
+this Program grant you additional permission to convey the resulting work.
+
+
+----------------------------------------------------------------------
+参考訳（日本語）。法的には上の英語の文面が優先します。
+
+WebcamFbt
+Copyright (C) 2026 ほたかっち
+
+このプログラムはフリーソフトウェアです。フリーソフトウェア財団が公表した
+GNU 一般公衆利用許諾書（GPL）のバージョン 3、または（あなたの選択により）
+それ以降のバージョンの条件の下で、再配布や改変ができます。
+
+このプログラムは役に立つことを願って配布していますが、商品性や特定の目的への
+適合性を含め、いかなる保証もありません。詳しくは GPL を読んでください。
+
+GPL の全文はファイル LICENSE にあります。無い場合は
+<https://www.gnu.org/licenses/> を参照してください。
+
+
+GPL バージョン 3 第 7 条に基づく追加の許可
+
+このプログラムまたは対象物を、Microsoft DirectML（またはその改変版）と
+リンクまたは組み合わせることで改変し、その結果のものに Microsoft の DirectML の
+使用許諾（Microsoft Software License Terms）の対象となる部分が含まれる場合でも、
+このプログラムの許諾者は、その結果のものを配布する追加の許可を与えます。
+
+（説明）Windows 版は GPU での推論のために DirectML.dll を同梱しています。DirectML は
+Microsoft 独自の使用許諾で、ソースが公開されていないため、この許可がないと GPL の
+条件を満たして配布できません。DirectML 以外の部分（このプログラム自身のソース）には、
+通常どおり GPL の条件がかかります。

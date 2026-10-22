@@ -1,6 +1,8 @@
 # サードパーティのライセンス
 
-WebcamFbt は以下のライブラリとモデルを使用しています。
+WebcamFbt 自身は GPL-3.0-or-later です（[LICENSE](LICENSE)、[LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt)）。
+以下のライブラリとモデルを使用しています。MIT・Apache-2.0・LGPL-2.1 以降のものは GPLv3 と両立します。
+GPL と両立しない DirectML には、組み合わせて配布することを認める追加の許可を付けています（下の ※）。
 
 ## ライブラリ
 
@@ -27,7 +29,8 @@ WebcamFbt は以下のライブラリとモデルを使用しています。
 FFmpeg は libOpenCvSharpExtern.dylib に含まれる形で、アプリ本体とは別のファイル（差し替え可能な動的ライブラリ）として同梱しています。
 
 ※ DirectML.dll は MIT ではなく Microsoft の使用許諾で、Windows 向けの機械学習アプリに組み込んで配布することが許可されています
-（単体での再配布は不可）。全文は [licenses/DirectML-LICENSE.txt](licenses/DirectML-LICENSE.txt)、
+（単体での再配布は不可）。GPL とは両立しないため、WebcamFbt の GPL には DirectML と組み合わせて配布することを認める
+追加の許可を付けています（[LICENSE-EXCEPTION.txt](LICENSE-EXCEPTION.txt)）。全文は [licenses/DirectML-LICENSE.txt](licenses/DirectML-LICENSE.txt)、
 DirectML が含む第三者のコンポーネントは [licenses/DirectML-ThirdPartyNotices.txt](licenses/DirectML-ThirdPartyNotices.txt) を参照してください。
 
 インストーラは [Inno Setup](https://jrsoftware.org/isinfo.php) で作成しています。

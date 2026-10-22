@@ -9,6 +9,8 @@ Webカメラ（1〜2台）の映像から姿勢推定し、VRChat の OSC トラ
 - コミットメッセージに `Co-Authored-By` の行は**入れない**
 - **フェーズごとに止まって、ユーザーに動作確認を求める**。確認が取れたらフェーズ単位でコミット
 - 使うモデル・ライブラリは配布して問題ないライセンスのものだけ（THIRD_PARTY_NOTICES.md に記載）。Ultralytics YOLO（AGPL）は使わない
+- WebcamFbt 自身のライセンスは **GPL-3.0-or-later**（LICENSE）＋ DirectML との組み合わせを認める追加の許可（LICENSE-EXCEPTION.txt）。
+  ライブラリを足すときは GPLv3 と両立するか確かめる（MIT・BSD・Apache-2.0・LGPL は可。GPLv2 のみ・独自ライセンスは不可か、例外の追記が要る）
 - 推論・カメラ・OSC・UI は別スレッド。UI を固めない
 - 姿勢推定は `IPoseEstimator2D` で抽象化し、差し替え可能に保つ
 
