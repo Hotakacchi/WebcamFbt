@@ -4,6 +4,7 @@
         xmlns:vm="clr-namespace:WebcamFbt.App.ViewModels"
         xmlns:views="clr-namespace:WebcamFbt.App.Views"
         Title="WebcamFbt - Webカメラ フルボディトラッキング"
+        Icon="/Assets/WebcamFbt.ico"
         Width="1280" Height="760" MinWidth="900" MinHeight="560"
         Background="#FF121316">
     <Window.DataContext>

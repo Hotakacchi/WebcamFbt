@@ -7,10 +7,17 @@ WebcamFbt は以下のライブラリとモデルを使用しています。
 | 名前 | 用途 | ライセンス |
 |---|---|---|
 | [ONNX Runtime](https://github.com/microsoft/onnxruntime)（Microsoft.ML.OnnxRuntime.DirectML） | 推論 | MIT |
-| [DirectML](https://github.com/microsoft/DirectML) | GPU 推論（ONNX Runtime に同梱） | MIT |
+| [DirectML](https://github.com/microsoft/DirectML)（Microsoft.AI.DirectML、DirectML.dll の再配布版） | GPU 推論 | Microsoft Software License Terms（※） |
 | [OpenCvSharp4](https://github.com/shimat/opencvsharp) | カメラ入力・画像処理 | Apache-2.0 |
 | [OpenCV](https://opencv.org/)（OpenCvSharp4.runtime.win に同梱） | 同上 | Apache-2.0 |
 | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | MVVM | MIT |
+| [.NET](https://github.com/dotnet/runtime) / [WPF](https://github.com/dotnet/wpf) | 実行環境（配布用の exe に同梱） | MIT |
+
+※ DirectML.dll は MIT ではなく Microsoft の使用許諾で、Windows 向けの機械学習アプリに組み込んで配布することが許可されています
+（単体での再配布は不可）。全文は [licenses/DirectML-LICENSE.txt](licenses/DirectML-LICENSE.txt)、
+DirectML が含む第三者のコンポーネントは [licenses/DirectML-ThirdPartyNotices.txt](licenses/DirectML-ThirdPartyNotices.txt) を参照してください。
+
+インストーラは [Inno Setup](https://jrsoftware.org/isinfo.php) で作成しています。
 
 ## モデル（実行時にダウンロード。このリポジトリと配布物には含まない）
 

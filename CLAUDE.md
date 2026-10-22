@@ -65,8 +65,10 @@ dotnet run --project src\WebcamFbt.App -c Release
   - [x] 5b: 実装・コミット済み（ユーザー確認済み）。右パネルを「カメラ／トラッキング／校正／VRChat」のタブに分割
     （タブ番号は MainViewModel.Guide.cs の定数と XAML の並びをそろえる）、手順ガイド（済み✓・次を強調・押すとタブ移動）、
     腰・両足・頭・OSC の色付き状態表示、上から見たトラッカーの図（`Views/TrackerTopDownView`）
-  - 5c で決めること: 単一 exe に加えて Inno Setup のインストーラも作るか（ユーザーがインストーラに関心あり）。
-    未署名 exe は SmartScreen の警告が出るので README で案内する
+  - [x] 5c: 実装・コミット済み。`scripts\build-release.ps1` でテスト→単一 exe（SingleFile.pubxml）→ Inno Setup（installer\WebcamFbt.iss）。
+    DirectML.dll は App から Microsoft.AI.DirectML を直接参照して同梱（以前は同梱されず Windows のものが使われていた）。
+    アイコンは scripts\make-icon.ps1。.iss と .ps1 は BOM 付き UTF-8 にする。
+    **残り: GitHub Releases への v0.1.0 のアップロード（未実施）**、利用者データが %LOCALAPPDATA% のどこに保存されているかの確認
 
 ## 設計の要点（フェーズ2）
 

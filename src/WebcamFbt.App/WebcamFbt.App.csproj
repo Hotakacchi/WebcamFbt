@@ -9,11 +9,27 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <PlatformTarget>x64</PlatformTarget>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- アイコンは scripts\make-icon.ps1 で作る -->
+    <ApplicationIcon>Assets\WebcamFbt.ico</ApplicationIcon>
+    <!-- DirectML のデバッグ用 DLL（大きい）は要らない -->
+    <Microsoft_AI_DirectML_SkipDebugLayerCopy>true</Microsoft_AI_DirectML_SkipDebugLayerCopy>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="OpenCvSharp4.WpfExtensions" Version="4.13.0.20260627" />
+    <!--
+      DirectML.dll（再配布版）を出力に入れるため、x64 のこのプロジェクトから直接参照する。
+      ONNX Runtime 経由（Vision は AnyCPU）だと DirectML のパッケージがコピーしないので、Windows に入っている
+      DirectML が使われてしまい、古い Windows 10 では GPU 推論に失敗する。版は ONNX Runtime 1.24.4 が依存するものに合わせる。
+      単一 exe でも、ONNX Runtime は展開先の同じフォルダの DirectML.dll を読む（確認済み）。
+    -->
+    <PackageReference Include="Microsoft.AI.DirectML" Version="1.15.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- ウィンドウ（タスクバー）のアイコン -->
+    <Resource Include="Assets\WebcamFbt.ico" />
   </ItemGroup>
 
   <ItemGroup>
