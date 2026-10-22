@@ -8,7 +8,7 @@ namespace WebcamFbt.Core.Tests;
 public class CalibratorTests
 {
     // 身長 1.7m の直立姿勢（トラッキング座標、+Y 上）。既知の骨の長さから比率を検算する。
-    private static Pose3D StandingPose(double yawDeg = 0)
+    internal static Pose3D StandingPose(double yawDeg = 0)
     {
         var pose = new Pose3D { BodyYawDeg = yawDeg };
         pose.Set(Joint.LeftShoulder, new Vector3(-0.20f, 1.40f, 0));

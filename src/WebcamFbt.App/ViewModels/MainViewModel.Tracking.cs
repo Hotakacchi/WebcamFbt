@@ -214,6 +214,12 @@ public sealed partial class MainViewModel
         sb.AppendLine($"OSC     {(OscEnabled ? $"{_osc.SendRate.Rate,5:F0} fps → {_osc.Endpoint}" : "送信オフ")}");
         if (_osc.LastError != null) sb.AppendLine($"OSC エラー: {_osc.LastError}");
         sb.AppendLine($"方式    {(_stereoActive ? "ステレオ（三角測量）" : "単眼")}");
+        if (_stereoActive && _tracking?.LastStereoStats is { } st)
+        {
+            // 精度の目安: 三角測量できた関節の数、再投影誤差、左右の脚の長さの差（大きければ測定がずれている）
+            var leg = st.LegLengthDiffMeters is { } d ? $"  脚の長さ差 {d * 100,3:F0}cm" : "";
+            sb.AppendLine($"精度    {st.Triangulated,2}/{st.Candidates,2}点  誤差 {st.MeanReprojErrorPx,4:F1}px{leg}{(st.Swapped ? "  左右入替" : "")}");
+        }
         if (frame == null)
         {
             var problem = _stereoActive ? _tracking?.StereoProblem : null;
@@ -274,6 +280,7 @@ public sealed partial class MainViewModel
         var sb = new StringBuilder();
         sb.AppendLine("キャリブレーション済み");
         if (cal.HasFloor) sb.AppendLine($"床の高さ {cal.FloorY,5:F2} m   正面補正 {cal.YawOffsetDeg,4:F0}°");
+        if (cal.Tilt is not null) sb.AppendLine($"カメラの傾き補正 {cal.TiltDeg,4:F1}°（ステレオで測定。この後カメラの傾きの設定は変えないでください）");
         sb.Append($"比率 肩{b.ShoulderWidth:F2} 腰{b.HipWidth:F2} 胴{b.Torso:F2} 腿{b.Thigh:F2} すね{b.Shin:F2} 足{b.Foot:F2}");
         CalibrationText = sb.ToString();
     }

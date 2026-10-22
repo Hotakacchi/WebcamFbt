@@ -4,15 +4,26 @@ using WebcamFbt.Core.Pose;
 namespace WebcamFbt.Core.Tracking;
 
 /// <summary>
-/// 数フレームの 3D 姿勢を貯めて、体の比率・床の高さ・正面方向を求める（カメラ 1 台）。
-/// カメラの方を向いて立った状態（T ポーズ）でキャプチャする前提。
+/// 数フレームの 3D 姿勢を貯めて、体の比率・床の高さ・正面方向（ステレオではカメラの傾きも）を求める。
+/// カメラの方を向いてまっすぐ立った状態（T ポーズ）でキャプチャする前提。
 ///
 /// 骨の長さは <see cref="Pose3D"/>（トラッキング座標、単位 m）から直接測る。
 /// 片側しか見えないフレームもあるので、各骨は見えたものだけ・左右それぞれを 1 標本として貯め、
 /// 最後に中央値を取る（外れ値に強くするため）。身長で割って比率にする。
+///
+/// 傾き（フェーズ 4d）: ステレオでは本物の 3D が取れるので、まっすぐ立った体の縦の向き（足首の中点 → 首）を
+/// 重力の方向とみなし、それを真上（+Y）に重ねる回転を求める（カメラのピッチとロールの補正）。
+/// 床の高さと正面方向は、その回転をかけた後の座標で測る。単眼では奥行きを仮定で出しているため前後の傾きが
+/// 測れないので、全フレームがステレオのときだけ求める。
 /// </summary>
 public sealed class Calibrator
 {
+    private static readonly Joint[] FootJoints =
+    [
+        Joint.LeftAnkle, Joint.RightAnkle, Joint.LeftHeel, Joint.RightHeel,
+        Joint.LeftBigToe, Joint.RightBigToe, Joint.LeftSmallToe, Joint.RightSmallToe,
+    ];
+
     private readonly List<double> _shoulderWidth = new();
     private readonly List<double> _hipWidth = new();
     private readonly List<double> _torso = new();
@@ -20,16 +31,21 @@ public sealed class Calibrator
     private readonly List<double> _shin = new();
     private readonly List<double> _foot = new();
     private readonly List<double> _neckToEars = new();
-    private readonly List<float> _floor = new();
+    private readonly List<Vector3[]> _feet = new();
+    private readonly List<(Vector3 Left, Vector3 Right)> _hips = new();
+    private readonly List<Vector3> _up = new();
     private readonly List<double> _yaw = new();
+    private int _stereoFrames;
 
     /// <summary>取り込んだフレーム数。</summary>
     public int FrameCount { get; private set; }
 
     /// <summary>1 フレーム分の姿勢を取り込む。使える骨だけ記録する。</summary>
-    public void Add(Pose3D pose)
+    /// <param name="stereo">三角測量で求めた姿勢か（傾きはステレオのときだけ求める）。</param>
+    public void Add(Pose3D pose, bool stereo = false)
     {
         FrameCount++;
+        if (stereo) _stereoFrames++;
 
         if (Neck(pose, out var neck))
         {
@@ -46,17 +62,25 @@ public sealed class Calibrator
         AddBone(_shoulderWidth, pose, Joint.LeftShoulder, Joint.RightShoulder);
         AddBone(_hipWidth, pose, Joint.LeftHip, Joint.RightHip);
 
-        // 床: このフレームで見えている足（足首・かかと・つま先）のうち、いちばん低い Y
-        float? lowest = null;
-        foreach (var j in new[]
+        // 床: このフレームで見えている足（足首・かかと・つま先）。傾きを補正してから一番低い点を取るので位置ごと持つ
+        var feet = new List<Vector3>();
+        foreach (var j in FootJoints)
         {
-            Joint.LeftAnkle, Joint.RightAnkle, Joint.LeftHeel, Joint.RightHeel,
-            Joint.LeftBigToe, Joint.RightBigToe, Joint.LeftSmallToe, Joint.RightSmallToe,
-        })
-        {
-            if (pose.TryGet(j, out var p) && (lowest is null || p.Y < lowest)) lowest = p.Y;
+            if (pose.TryGet(j, out var p)) feet.Add(p);
         }
-        if (lowest is not null) _floor.Add(lowest.Value);
+        if (feet.Count > 0) _feet.Add([.. feet]);
+
+        if (pose.TryGet(Joint.LeftHip, out var lh) && pose.TryGet(Joint.RightHip, out var rh)) _hips.Add((lh, rh));
+
+        // 体の縦の向き: 足首の中点 → 首（長いほど誤差に強い）。足首が見えなければ骨盤 → 首
+        if (Neck(pose, out var top))
+        {
+            if (pose.TryGetMid(Joint.LeftAnkle, Joint.RightAnkle, out var bottom) || Pelvis(pose, out bottom))
+            {
+                var up = top - bottom;
+                if (up.LengthSquared() > 1e-4f) _up.Add(Vector3.Normalize(up));
+            }
+        }
 
         _yaw.Add(pose.BodyYawDeg);
     }
@@ -82,9 +106,54 @@ public sealed class Calibrator
             Foot: Ratio(_foot, d.Foot),
             NeckToEars: Ratio(_neckToEars, d.NeckToEars));
 
-        float floorY = _floor.Count > 0 ? MedianF(_floor) : float.NaN;
-        double yaw = _yaw.Count > 0 ? Median(_yaw) : 0;
-        return new CalibrationData(body, floorY, yaw);
+        // 傾き（全フレームがステレオのときだけ）。体の縦の向きの平均を真上に重ねる最小の回転
+        Quaternion? tilt = null;
+        if (_stereoFrames == FrameCount && _up.Count > 0)
+        {
+            var mean = Vector3.Zero;
+            foreach (var u in _up) mean += u;
+            tilt = FromTo(mean, Vector3.UnitY);
+        }
+        var rotate = tilt ?? Quaternion.Identity;
+
+        // 床: 傾きを補正した後の、フレームごとの一番低い足の Y の中央値
+        var lowest = new List<float>();
+        foreach (var feet in _feet)
+        {
+            float min = float.MaxValue;
+            foreach (var p in feet) min = MathF.Min(min, Vector3.Transform(p, rotate).Y);
+            lowest.Add(min);
+        }
+        float floorY = lowest.Count > 0 ? MedianF(lowest) : float.NaN;
+
+        // 正面方向: 傾きを補正したときは、補正後の腰の左右から測り直す（推定時のヨーは傾いた座標で測っているため）
+        double yaw;
+        if (tilt is not null && _hips.Count > 0)
+        {
+            var yaws = new List<double>();
+            foreach (var (l, r) in _hips)
+            {
+                var right = Vector3.Transform(r, rotate) - Vector3.Transform(l, rotate);
+                yaws.Add(System.Math.Atan2(-right.Z, right.X) * 180.0 / System.Math.PI);
+            }
+            yaw = Median(yaws);
+        }
+        else
+        {
+            yaw = _yaw.Count > 0 ? Median(_yaw) : 0;
+        }
+        return new CalibrationData(body, floorY, yaw, tilt);
+    }
+
+    /// <summary>向き from を向き to に重ねる最小の回転。</summary>
+    private static Quaternion FromTo(Vector3 from, Vector3 to)
+    {
+        from = Vector3.Normalize(from);
+        to = Vector3.Normalize(to);
+        var axis = Vector3.Cross(from, to);
+        if (axis.LengthSquared() < 1e-12f) return Quaternion.Identity; // もう重なっている（逆向きは立っていればありえない）
+        float angle = MathF.Acos(System.Math.Clamp(Vector3.Dot(from, to), -1f, 1f));
+        return Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), angle);
     }
 
     private static void AddBone(List<double> list, Pose3D pose, Joint a, Joint b)

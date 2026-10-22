@@ -54,6 +54,14 @@ public sealed class TrackingProcessor
     }
     private volatile string? _stereoProblem;
 
+    /// <summary>直近の <see cref="ProcessStereo"/> の品質の目安（精度確認の表示用。三角測量しなかったときは null）。</summary>
+    public StereoStats? LastStereoStats
+    {
+        get => _lastStereoStats;
+        private set => _lastStereoStats = value;
+    }
+    private volatile StereoStats? _lastStereoStats;
+
     // キャリブレーション中の状態。UI スレッドと推論スレッドから触るので volatile。
     private volatile Calibrator? _calibrator;
     private volatile int _calibrationTarget;
@@ -136,7 +144,7 @@ public sealed class TrackingProcessor
         _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
         var pose3D = _lifter.Lift(points, layout, camera, _toTracking, s, Body, time);
-        return pose3D is null ? null : Finish(pose3D, time, capturedTimestamp);
+        return pose3D is null ? null : Finish(pose3D, time, capturedTimestamp, stereo: false);
     }
 
     /// <summary>
@@ -152,11 +160,13 @@ public sealed class TrackingProcessor
         if (stereo is null)
         {
             StereoProblem = "ステレオ校正がありません";
+            LastStereoStats = null;
             return null;
         }
         if (!stereo.Camera1.Matches(view1.ImageWidth, view1.ImageHeight) || !stereo.Camera2.Matches(view2.ImageWidth, view2.ImageHeight))
         {
             StereoProblem = "解像度が校正したときと違います";
+            LastStereoStats = null;
             return null;
         }
 
@@ -167,21 +177,22 @@ public sealed class TrackingProcessor
         var points2 = _gate2.Apply(view2.Pose, layout.Count, time, s.KeypointScoreThreshold, s.KeypointHoldSeconds);
         _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
-        var pose3D = StereoTriangulator.Triangulate(points1, points2, layout, stereo, _toTracking, s.StereoMaxReprojErrorPx);
+        var pose3D = StereoTriangulator.Triangulate(points1, points2, layout, stereo, _toTracking, s.StereoMaxReprojErrorPx, out var stats);
+        LastStereoStats = stats;
         if (pose3D is null)
         {
             StereoProblem = "2 台に共通して写っている関節がありません";
             return null;
         }
         StereoProblem = null;
-        return Finish(pose3D, time, timestamp);
+        return Finish(pose3D, time, timestamp, stereo: true);
     }
 
     /// <summary>
     /// 3D の姿勢からトラッカーを求める（単眼・ステレオ共通の後段）。
-    /// 体のキャリブレーション中ならこの姿勢を取り込み、床の高さ・向きの補正をかけて返す。
+    /// 体のキャリブレーション中ならこの姿勢を取り込み、床の高さ・向き・傾きの補正をかけて返す。
     /// </summary>
-    private TrackerFrame Finish(Pose3D pose3D, double time, long capturedTimestamp)
+    private TrackerFrame Finish(Pose3D pose3D, double time, long capturedTimestamp, bool stereo)
     {
         var s = Settings;
 
@@ -189,7 +200,7 @@ public sealed class TrackingProcessor
         var cal = _calibrator;
         if (cal is not null)
         {
-            cal.Add(pose3D);
+            cal.Add(pose3D, stereo);
             if (cal.FrameCount >= _calibrationTarget)
             {
                 var result = cal.Build(s.HeightMeters);

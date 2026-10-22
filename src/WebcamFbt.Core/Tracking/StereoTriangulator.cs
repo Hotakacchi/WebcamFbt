@@ -4,6 +4,14 @@ using WebcamFbt.Core.Pose;
 
 namespace WebcamFbt.Core.Tracking;
 
+/// <summary>三角測量 1 回分の品質の目安（精度確認の表示用）。</summary>
+/// <param name="Candidates">両カメラで有効だった関節の数。</param>
+/// <param name="Triangulated">そのうち三角測量できた（捨てなかった）関節の数。</param>
+/// <param name="MeanReprojErrorPx">三角測量できた関節の再投影誤差の平均 [px]。小さいほど 2 台が同じ点を見ている。</param>
+/// <param name="LegLengthDiffMeters">左右の脚（股関節〜膝〜足首）の長さの差 [m]。人の体はほぼ左右対称なので、大きければ測定がずれている。</param>
+/// <param name="Swapped">カメラ 2 の左右を入れ替えたか。</param>
+public sealed record StereoStats(int Candidates, int Triangulated, double MeanReprojErrorPx, double? LegLengthDiffMeters, bool Swapped);
+
 /// <summary>
 /// カメラ 2 台の 2D キーポイントから、三角測量で 3D 姿勢を求める（フェーズ 4c）。
 ///
@@ -97,30 +105,57 @@ public static class StereoTriangulator
         StereoCalibration stereo,
         CameraToTracking toTracking,
         double maxReprojErrorPx)
+        => Triangulate(view1, view2, layout, stereo, toTracking, maxReprojErrorPx, out _);
+
+    /// <inheritdoc cref="Triangulate(KeypointGate.GatedPoint[], KeypointGate.GatedPoint[], KeypointLayout, StereoCalibration, CameraToTracking, double)"/>
+    /// <param name="stats">品質の目安（精度確認の表示用）。</param>
+    public static Pose3D? Triangulate(
+        KeypointGate.GatedPoint[] view1,
+        KeypointGate.GatedPoint[] view2,
+        KeypointLayout layout,
+        StereoCalibration stereo,
+        CameraToTracking toTracking,
+        double maxReprojErrorPx,
+        out StereoStats stats)
     {
         // 姿勢推定は人の左右を取り違えることがある（特に横向き・後ろ向き）。カメラ 2 だけ取り違えると
         // 左足と右足を組み合わせて三角測量してしまうので、左右が矛盾していて入れ替えると解消するなら入れ替える
         bool swap = ShouldSwapCamera2(view1, view2, layout, stereo);
 
         var cam1Points = new Vector3?[layout.Count];
-        int valid = 0;
+        int candidates = 0, valid = 0;
+        double errorSum = 0;
         for (int i = 0; i < layout.Count; i++)
         {
             int i2 = swap ? MirrorIndex(layout, i) : i;
             if (!view1[i].Valid || !view2[i2].Valid) continue;
+            candidates++;
             var result = TriangulatePoint(new Vector2(view1[i].X, view1[i].Y), new Vector2(view2[i2].X, view2[i2].Y), stereo);
             if (result is null || result.Value.ReprojErrorPx > maxReprojErrorPx) continue;
             cam1Points[i] = result.Value.Camera1Point;
+            errorSum += result.Value.ReprojErrorPx;
             valid++;
         }
-        if (valid == 0) return null;
 
-        // 体までの距離（カメラ 1 から骨盤）と体の向き
         Vector3? Get(Joint j)
         {
             int i = layout.IndexOf(j);
             return i >= 0 ? cam1Points[i] : null;
         }
+
+        // 左右の脚の長さの差（距離は座標系によらないのでカメラ 1 の座標のまま測る）
+        double? Leg(Joint hip, Joint knee, Joint ankle)
+            => Get(hip) is { } h && Get(knee) is { } k && Get(ankle) is { } a
+                ? Vector3.Distance(h, k) + Vector3.Distance(k, a)
+                : null;
+        var leftLeg = Leg(Joint.LeftHip, Joint.LeftKnee, Joint.LeftAnkle);
+        var rightLeg = Leg(Joint.RightHip, Joint.RightKnee, Joint.RightAnkle);
+        double? legDiff = leftLeg is not null && rightLeg is not null ? System.Math.Abs(leftLeg.Value - rightLeg.Value) : null;
+        stats = new StereoStats(candidates, valid, valid > 0 ? errorSum / valid : 0, legDiff, swap);
+
+        if (valid == 0) return null;
+
+        // 体までの距離（カメラ 1 から骨盤）と体の向き
         var lh = Get(Joint.LeftHip);
         var rh = Get(Joint.RightHip);
         double depth = 0, yawDeg = 0;
