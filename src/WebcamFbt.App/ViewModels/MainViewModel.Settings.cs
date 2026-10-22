@@ -30,6 +30,7 @@ public sealed partial class MainViewModel
         nameof(PositionMinCutoff), nameof(PositionBeta), nameof(RotationMinCutoff), nameof(RotationBeta),
         nameof(OscEnabled), nameof(SendHeadPosition),
         nameof(BoardInnerCols), nameof(BoardInnerRows), nameof(BoardSquareMm),
+        nameof(CheckForUpdates),
     ];
 
     private readonly AppSettingsStore _settingsStore = new();
@@ -56,8 +57,16 @@ public sealed partial class MainViewModel
         {
             _loadingSettings = false;
         }
+        if (_settingsStore.LoadProblem is { } problem)
+        {
+            // 元のファイルは上書きせずに残してある（新しい版が古い設定を読めなかったときなど）
+            Status = _settingsStore.BackupPath is { } backup
+                ? $"設定を読めなかったので既定値で起動しました（{problem}）。元のファイルは {Path.GetFileName(backup)} に残しています"
+                : $"設定を読めなかったので既定値で起動しました（{problem}）";
+        }
         PropertyChanged += OnSettingPropertyChanged;
         UpdateGuide();
+        InitializeUpdates();
     }
 
     /// <summary>
@@ -120,6 +129,10 @@ public sealed partial class MainViewModel
             _tracking.RestoreCalibration(body);
             CalibrationText = DescribeBodyCalibration(body);
         }
+
+        CheckForUpdates = s.CheckForUpdates;
+        _skippedUpdateVersion = s.SkippedUpdateVersion;
+        _lastUpdateCheckUtc = s.LastUpdateCheckUtc;
     }
 
     private AppSettings BuildSettings() => new()
@@ -152,6 +165,9 @@ public sealed partial class MainViewModel
         BoardInnerRows = BoardInnerRows,
         BoardSquareMm = BoardSquareMm,
         BodyCalibration = _tracking?.Calibration is { IsCalibrated: true } cal ? BodyCalibrationSettings.From(cal) : null,
+        CheckForUpdates = CheckForUpdates,
+        SkippedUpdateVersion = _skippedUpdateVersion,
+        LastUpdateCheckUtc = _lastUpdateCheckUtc,
     };
 
     private void OnSettingPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -183,6 +199,7 @@ public sealed partial class MainViewModel
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // 読めなかった元のファイルを残せないときも、ここに来る（上書きせずに止める）
             Status = $"設定を保存できませんでした: {ex.Message}";
         }
     }

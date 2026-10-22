@@ -82,20 +82,23 @@ public class CameraCalibrationStoreTests
     }
 
     [Fact]
-    public void 壊れたファイルは無視する()
+    public void 壊れたファイルは別名で残してから直す()
     {
         var path = TempFile();
+        CameraCalibrationStore? store = null;
         try
         {
             File.WriteAllText(path, "{ 壊れている");
-            var store = new CameraCalibrationStore(path);
+            store = new CameraCalibrationStore(path);
             Assert.Null(store.GetCamera(0, 1280, 720));
-            store.SaveCamera(0, Cal()); // 上書きして直る
+            store.SaveCamera(0, Cal()); // 元のファイルを別名で残してから上書きして直る
             Assert.NotNull(store.GetCamera(0, 1280, 720));
+            Assert.Equal("{ 壊れている", File.ReadAllText(store.BackupPath!));
         }
         finally
         {
             File.Delete(path);
+            if (store?.BackupPath is { } backup) File.Delete(backup);
         }
     }
 }

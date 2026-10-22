@@ -24,6 +24,12 @@ public partial class MainWindow : Window
 
         // 隠れている間は見えない映像を描かない（ゲーム中の負荷を減らす）
         IsVisibleChanged += (_, _) => ViewModel.SuspendPreview(!IsVisible);
+
+        // 新しい版が見つかったとき、画面が隠れていればトレイで知らせる（見えていれば画面の上の帯で分かる）
+        ViewModel.UpdateFound += update =>
+        {
+            if (!IsVisible) _tray.ShowUpdateNotice(update.Version);
+        };
     }
 
     private MainViewModel ViewModel => (MainViewModel)DataContext;

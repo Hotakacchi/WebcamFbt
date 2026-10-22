@@ -190,6 +190,26 @@
                                HorizontalAlignment="Right" Margin="0,6,0,0" />
                 </StackPanel>
 
+                <!-- 新しい版のお知らせ（あるときだけ） -->
+                <Border DockPanel.Dock="Top" Background="#FF1E3A6B" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                        CornerRadius="6" Padding="10,8" Margin="0,8,0,0"
+                        Visibility="{Binding HasUpdate, Converter={StaticResource BoolToVisibility}}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding UpdateBannerText}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" />
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="ダウンロードのページを開く" Command="{Binding OpenUpdatePageCommand}" Height="26" />
+                            <Button Grid.Column="1" Content="あとで" Command="{Binding DismissUpdateCommand}" Height="26" Margin="4,0,0,0" Padding="8,0" />
+                            <Button Grid.Column="2" Content="通知しない" Command="{Binding SkipUpdateCommand}" Height="26" Margin="4,0,0,0" Padding="8,0"
+                                    ToolTip="この版は通知しない（もっと新しい版が出たら知らせる）" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
                 <!-- 手順ガイド（済んだ段階に ✓、次にやる段階を強調。押すと設定のタブを開く） -->
                 <Border DockPanel.Dock="Top" Background="{StaticResource CardBrush}" CornerRadius="6" Padding="8,6" Margin="0,8,0,4">
                     <ItemsControl ItemsSource="{Binding GuideSteps}">
@@ -271,6 +291,21 @@
                                   Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
                         <CheckBox Content="プレビューを表示（オフで少し軽くなる）" IsChecked="{Binding PreviewEnabled}"
                                   Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+
+                        <TextBlock Text="アプリ" Style="{StaticResource SectionHeader}" />
+                        <CheckBox Content="新しい版が出たら知らせる" IsChecked="{Binding CheckForUpdates}"
+                                  Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                        <TextBlock Text="1 日に 1 回、GitHub に新しい版があるか問い合わせます（送るのはアプリ名と版だけです）。"
+                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,0" />
+                        <Grid Margin="0,6,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="今すぐ確認" Command="{Binding CheckUpdatesNowCommand}" Height="26" Padding="10,0" />
+                            <TextBlock Grid.Column="1" Text="{Binding UpdateStatusText}" Foreground="{StaticResource SubTextBrush}"
+                                       FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="8,0,0,0" />
+                        </Grid>
                     </StackPanel>
                 </ScrollViewer>
                 </TabItem>

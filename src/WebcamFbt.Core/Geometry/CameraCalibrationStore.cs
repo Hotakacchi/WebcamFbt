@@ -18,12 +18,18 @@ public sealed class CameraCalibrationStore
         public StereoCalibration? Stereo { get; set; }
     }
 
+    private readonly Persistence.JsonFileGuard _guard;
+
     public string FilePath { get; }
+
+    /// <summary>読めなかったファイルを残した場所（残していなければ null）。</summary>
+    public string? BackupPath => _guard.BackupPath;
 
     public CameraCalibrationStore(string? filePath = null)
     {
         FilePath = filePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "WebcamFbt", "calibration.json");
+        _guard = new Persistence.JsonFileGuard(FilePath);
     }
 
     private static string Key(int deviceIndex, int width, int height) => $"device{deviceIndex}_{width}x{height}";
@@ -63,15 +69,18 @@ public sealed class CameraCalibrationStore
         {
             return JsonSerializer.Deserialize<FileModel>(File.ReadAllText(FilePath), JsonOptions) ?? new FileModel();
         }
-        catch (Exception ex) when (ex is JsonException or IOException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            // 壊れたファイルは無視する（次に保存したときに上書きされる）
+            // 読めないファイルは無視して進める。保存はファイル全体の書き直しなので、
+            // 他のカメラの校正まで消えないよう、元のファイルは日時付きの別名で残しておく
+            _guard.OnLoadFailed(ex);
             return new FileModel();
         }
     }
 
     private void Save(FileModel model)
     {
+        _guard.BeforeSave();
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         // 書き込み途中で落ちても元のファイルが壊れないよう、一時ファイルに書いてから置き換える
         var tmp = FilePath + ".tmp";

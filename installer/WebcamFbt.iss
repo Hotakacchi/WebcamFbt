@@ -8,6 +8,7 @@
 ; - 新しい版のインストーラを起動すると、今入っているものに上書きする（更新）。AppId が同じなら前回の入れ先・
 ;   インストールの種類（ユーザーごと / すべてのユーザー）・タスクの選択をそのまま使い、入れ先と使用許諾の画面は飛ばす。
 ;   アプリが起動中なら閉じるか確認してから上書きする。古い版で上書きしようとしたときは確認する
+; - 更新しても設定・カメラの校正の結果（%LOCALAPPDATA%\WebcamFbt）には触れない。念のため更新の前に backup\ へ写しを取る
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
@@ -116,6 +117,28 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := (PageID = wpLicense) and IsUpgrade();
+end;
+
+// 更新の前に、設定とカメラの校正の結果を残しておく（%LOCALAPPDATA%\WebcamFbt\backup\<更新前の版>\）。
+// インストーラ自体はこれらのファイルに触れないが、新しい版がうまく読めなかったときに戻せるように
+procedure BackupUserData();
+var
+  DataDir, BackupDir: String;
+begin
+  DataDir := ExpandConstant('{localappdata}\WebcamFbt');
+  BackupDir := DataDir + '\backup\' + GetInstalledVersion();
+  if not (FileExists(DataDir + '\settings.json') or FileExists(DataDir + '\calibration.json')) then Exit;
+  if not ForceDirectories(BackupDir) then Exit;
+  if FileExists(DataDir + '\settings.json') then
+    FileCopy(DataDir + '\settings.json', BackupDir + '\settings.json', False);
+  if FileExists(DataDir + '\calibration.json') then
+    FileCopy(DataDir + '\calibration.json', BackupDir + '\calibration.json', False);
+  Log('利用者データを残しました: ' + BackupDir);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if (CurStep = ssInstall) and IsUpgrade() then BackupUserData();
 end;
 
 // 確認画面に「更新」であることを出す

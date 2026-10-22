@@ -52,6 +52,16 @@ public sealed class AppSettings
 
     // ---- 体のキャリブレーション（未実施なら null） ----
     public BodyCalibrationSettings? BodyCalibration { get; set; }
+
+    // ---- 新しい版の確認 ----
+    /// <summary>新しい版が出ていないか GitHub Releases に問い合わせる。</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>「この版は通知しない」を選んだ版（例: 0.1.2）。</summary>
+    public string? SkippedUpdateVersion { get; set; }
+
+    /// <summary>最後に確認できた日時（UTC）。1 日に 1 回だけ問い合わせるため。</summary>
+    public DateTime? LastUpdateCheckUtc { get; set; }
 }
 
 /// <summary>

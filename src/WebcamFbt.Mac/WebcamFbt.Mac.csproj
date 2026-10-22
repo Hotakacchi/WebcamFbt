@@ -43,6 +43,7 @@
     <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.CameraCalibration.cs" Link="ViewModels\Shared\MainViewModel.CameraCalibration.cs" />
     <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.Guide.cs" Link="ViewModels\Shared\MainViewModel.Guide.cs" />
     <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.Settings.cs" Link="ViewModels\Shared\MainViewModel.Settings.cs" />
+    <Compile Include="..\WebcamFbt.App\ViewModels\MainViewModel.Updates.cs" Link="ViewModels\Shared\MainViewModel.Updates.cs" />
     <!-- 版の表示（ウィンドウのタイトル・右パネルの下・メニューバーのアイコンの説明） -->
     <Compile Include="..\WebcamFbt.App\AppInfo.cs" Link="Shared\AppInfo.cs" />
   </ItemGroup>

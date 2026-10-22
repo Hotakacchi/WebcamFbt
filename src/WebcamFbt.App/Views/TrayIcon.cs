@@ -19,6 +19,9 @@ public sealed class TrayIcon : IDisposable
     private readonly Forms.ToolStripMenuItem _startStopItem;
     private bool _hiddenNoticeShown;
 
+    /// <summary>最後に出した通知が「新しい版」のものか（押されたらダウンロードのページを開く）。</summary>
+    private bool _updateNoticeShown;
+
     /// <summary>「表示」が選ばれた（ダブルクリックを含む）。</summary>
     public event Action? ShowRequested;
 
@@ -50,6 +53,11 @@ public sealed class TrayIcon : IDisposable
             };
         }
         _icon.DoubleClick += (_, _) => ShowRequested?.Invoke();
+        _icon.BalloonTipClicked += (_, _) =>
+        {
+            if (_updateNoticeShown) _vm.OpenUpdatePageCommand.Execute(null);
+            else ShowRequested?.Invoke();
+        };
 
         _vm.PropertyChanged += OnViewModelPropertyChanged;
         UpdateText();
@@ -62,8 +70,17 @@ public sealed class TrayIcon : IDisposable
     {
         if (_hiddenNoticeShown) return;
         _hiddenNoticeShown = true;
+        _updateNoticeShown = false;
         _icon.ShowBalloonTip(4000, "WebcamFbt は動き続けています",
             "タスクトレイのアイコンから、画面の表示・開始 / 停止・終了ができます。", Forms.ToolTipIcon.Info);
+    }
+
+    /// <summary>新しい版が出たことを知らせる（画面が隠れているとき）。押すとダウンロードのページを開く。</summary>
+    public void ShowUpdateNotice(string version)
+    {
+        _updateNoticeShown = true;
+        _icon.ShowBalloonTip(8000, $"WebcamFbt の新しい版 v{version} が出ています",
+            "ここを押すとダウンロードのページを開きます。", Forms.ToolTipIcon.Info);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
