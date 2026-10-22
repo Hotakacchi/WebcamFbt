@@ -17,44 +17,110 @@
 
         <!-- プレビュー -->
         <Grid Grid.Column="0" Margin="12">
-            <Border Background="Black" CornerRadius="6">
-                <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
-            </Border>
-            <TextBlock Text="「開始」を押すとカメラ映像が表示されます"
-                       Foreground="{StaticResource SubTextBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
-                        <Setter Property="Visibility" Value="Collapsed" />
+            <!-- 単眼プレビュー（1台モード） -->
+            <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding PreviewImage}" Value="{x:Null}">
-                                <Setter Property="Visibility" Value="Visible" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </TextBlock.Style>
-            </TextBlock>
-            <!-- 統計情報（左上に重ねて表示） -->
-            <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
-                    HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10">
-                <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
-                           FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="13" />
-            </Border>
-            <!-- トラッカーの値（左下に重ねて表示） -->
-            <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
-                    HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10">
-                <Border.Style>
-                    <Style TargetType="Border">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding TrackingText}" Value="">
+                            <DataTrigger Binding="{Binding TwoCameraMode}" Value="True">
                                 <Setter Property="Visibility" Value="Collapsed" />
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
-                </Border.Style>
-                <TextBlock Text="{Binding TrackingText}" Foreground="#FFE6E6E6"
-                           FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="13" />
-            </Border>
+                </Grid.Style>
+                <Border Background="Black" CornerRadius="6">
+                    <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
+                </Border>
+                <TextBlock Text="「開始」を押すとカメラ映像が表示されます"
+                           Foreground="{StaticResource SubTextBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding PreviewImage}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <!-- 統計情報（左上に重ねて表示） -->
+                <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
+                        HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10">
+                    <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
+                               FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="13" />
+                </Border>
+                <!-- トラッカーの値（左下に重ねて表示） -->
+                <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
+                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding TrackingText}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding TrackingText}" Foreground="#FFE6E6E6"
+                               FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="13" />
+                </Border>
+            </Grid>
+
+            <!-- 2台プレビュー（ステレオモード。4a では三角測量はせず各カメラの2Dを表示） -->
+            <Grid Visibility="{Binding TwoCameraMode, Converter={StaticResource BoolToVisibility}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- カメラ1（トラッキングに使用） -->
+                <Grid Grid.Column="0" Margin="0,0,6,0">
+                    <Border Background="Black" CornerRadius="6">
+                        <Image Source="{Binding PreviewImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
+                    </Border>
+                    <Border Background="#AA000000" CornerRadius="4" Padding="8,4"
+                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8">
+                        <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
+                                   FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="12" />
+                    </Border>
+                    <Border Background="#AA1E6FEB" CornerRadius="4" Padding="8,3"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
+                        <TextBlock Text="カメラ1" Foreground="White" FontWeight="SemiBold" FontSize="12" />
+                    </Border>
+                    <Border Background="#AA000000" CornerRadius="4" Padding="8,4"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding TrackingText}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                        <TextBlock Text="{Binding TrackingText}" Foreground="#FFE6E6E6"
+                                   FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="12" />
+                    </Border>
+                </Grid>
+
+                <!-- カメラ2（プレビュー＋2Dのみ） -->
+                <Grid Grid.Column="1" Margin="6,0,0,0">
+                    <Border Background="Black" CornerRadius="6">
+                        <Image Source="{Binding PreviewImage2}" Stretch="Uniform" RenderOptions.BitmapScalingMode="LowQuality" />
+                    </Border>
+                    <Border Background="#AA000000" CornerRadius="4" Padding="8,4"
+                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8">
+                        <TextBlock Text="{Binding StatsText2}" Foreground="#FFE6E6E6"
+                                   FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="12" />
+                    </Border>
+                    <Border Background="#AA1E6FEB" CornerRadius="4" Padding="8,3"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8">
+                        <TextBlock Text="カメラ2" Foreground="White" FontWeight="SemiBold" FontSize="12" />
+                    </Border>
+                </Grid>
+            </Grid>
         </Grid>
 
         <!-- 設定パネル -->
@@ -91,6 +157,12 @@
                             <ComboBox ItemsSource="{Binding FpsChoices}" SelectedItem="{Binding SelectedFps}" />
                             <TextBlock Text="取得方式" Style="{StaticResource Label}" />
                             <ComboBox ItemsSource="{Binding BackendChoices}" SelectedItem="{Binding SelectedBackend}" />
+                            <CheckBox Content="カメラを2台使う（ステレオ）" IsChecked="{Binding TwoCameraMode}"
+                                      Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
+                            <StackPanel Visibility="{Binding TwoCameraMode, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="カメラ2 デバイス（解像度・fps はカメラ1と同じ）" Style="{StaticResource Label}" />
+                                <ComboBox ItemsSource="{Binding CameraChoices}" SelectedItem="{Binding SelectedCamera2}" />
+                            </StackPanel>
                         </StackPanel>
 
                         <TextBlock Text="推論" Style="{StaticResource SectionHeader}" />

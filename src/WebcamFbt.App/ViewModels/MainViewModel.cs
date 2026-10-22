@@ -81,6 +81,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public MainViewModel()
     {
         _selectedCamera = CameraChoices[0];
+        _selectedCamera2 = CameraChoices.Count > 1 ? CameraChoices[1] : CameraChoices[0];
         _selectedResolution = ResolutionChoices[1];
         _selectedFps = FpsChoices[1];
         _selectedBackend = BackendChoices[0];
@@ -104,12 +105,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnScoreThresholdChanged(double value)
     {
         if (_pipeline != null) _pipeline.DrawScoreThreshold = (float)value;
+        if (_pipeline2 != null) _pipeline2.DrawScoreThreshold = (float)value;
     }
 
     partial void OnPreviewEnabledChanged(bool value)
     {
         if (_pipeline != null) _pipeline.PreviewEnabled = value;
-        if (!value) PreviewImage = null;
+        if (_pipeline2 != null) _pipeline2.PreviewEnabled = value;
+        if (!value) { PreviewImage = null; PreviewImage2 = null; }
     }
 
     // 準備中にもう一度押して中止できるよう、同時実行を許可する
@@ -186,6 +189,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             IsRunning = true;
             var fmt = camera.ActualFormat;
             Status = $"実行中（カメラ {settings.DeviceIndex}: {fmt.Width}×{fmt.Height} @ {fmt.Fps:F0}fps）";
+
+            if (TwoCameraMode)
+            {
+                try
+                {
+                    await StartSecondCameraAsync(device, progress, _startCts.Token);
+                    Status = $"実行中（2 台: カメラ {settings.DeviceIndex} + {SelectedCamera2.Value}）";
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    StopPipeline();
+                    Status = $"カメラ 2 を開始できませんでした: {ex.Message}";
+                    return;
+                }
+            }
+
             _previewTimer.Start();
             _statsTimer.Start();
         }
@@ -212,6 +235,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _statsTimer.Stop();
         _pipeline?.Dispose();
         _pipeline = null;
+        StopSecondCamera();
         StopTracking();
         IsRunning = false;
         Status = "停止中";
@@ -224,6 +248,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void UpdatePreview()
     {
+        UpdatePreview2();
+
         var preview = _pipeline?.Preview.TryTake();
         if (preview == null) return;
         using (preview)
@@ -260,6 +286,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             $"実行    {s.Provider}\n" +
             $"人物    {(s.PersonFound ? "検出中" : "見つかりません")}";
         UpdateTrackingText();
+        UpdateStats2();
     }
 
     public void Dispose()
@@ -267,6 +294,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StopPipeline();
         _estimator?.Dispose();
         _estimator = null;
+        _estimator2?.Dispose();
+        _estimator2 = null;
         _osc.Dispose();
     }
 }
