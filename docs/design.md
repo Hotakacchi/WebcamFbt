@@ -112,3 +112,21 @@ Core は OpenCV 非依存を保つ。チェッカーボード検出・ステレ�
 - 4b: チェッカーボードでステレオ校正（R,t＋再投影誤差）＋保存
 - 4c: 三角測量で3D化 → 既存後段へ。単眼/ステレオ切替
 - 4d: 床・向き校正のステレオ対応と精度確認
+
+## 将来の検討: Mac 対応（Avalonia + CoreML）
+
+Windows を持たず Mac を使う人向け。Mac でこのアプリを動かし、OSC を Quest 単体（スタンドアロン）の
+VRChat に飛ばせば、Windows なしで FBT ができる（VRChat 自体は Mac では動かないのでプレイは Quest 側）。
+
+現在の構成は OS 依存を UI・推論 EP・カメラ取得の 3 点に閉じ込めてあるので、“作り直し”ではなく
+“フロントの載せ替え”で済む見込み。すぐ着手する話ではなく、Windows 版をフェーズ5まで固めてから検討する。
+
+- そのまま流用: `Core`（Geometry/Tracking/Pose、純 C#）、`Osc`（UDP）、.NET 10（macOS / Apple Silicon 対応）
+- 作り替え:
+  - UI: WPF → **Avalonia**（クロスプラットフォーム XAML）。CommunityToolkit.Mvvm はそのまま使えるので ViewModel は流用
+  - 推論 EP: ONNX Runtime **DirectML → CoreML EP**（Apple GPU/Neural Engine）または CPU。
+    `OnnxSessionFactory` に EP ごとの分岐が要る（DirectML 専用の EnableMemoryPattern=false / ORT_SEQUENTIAL は CoreML には不要／別制約）
+  - カメラ取得: 最大の難所。OpenCvSharp4 は Apple Silicon ネイティブの提供が弱い。
+    `OpenCvCameraSource` を `ICameraSource` 的に抽象化し、AVFoundation ベースの Mac 専用実装を差し替える案。
+    RTMPose の前処理（アフィン切り出し等）も OpenCV 依存なので、OpenCV 非依存化 or Mac で動く置き換えを検討
+- 進め方の目安: ①Windows 版をフェーズ5まで → ②Avalonia 版を Core/Osc 共有で追加 → ③推論 EP 抽象化 → ④カメラ取得抽象化＋Mac 実装
