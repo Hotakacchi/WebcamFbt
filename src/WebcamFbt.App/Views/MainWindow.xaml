@@ -40,6 +40,21 @@
                 <TextBlock Text="{Binding StatsText}" Foreground="#FFE6E6E6"
                            FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="13" />
             </Border>
+            <!-- トラッカーの値（左下に重ねて表示） -->
+            <Border Background="#AA000000" CornerRadius="4" Padding="10,6"
+                    HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding TrackingText}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock Text="{Binding TrackingText}" Foreground="#FFE6E6E6"
+                           FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="13" />
+            </Border>
         </Grid>
 
         <!-- 設定パネル -->
@@ -94,6 +109,69 @@
                                   Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
                         <CheckBox Content="プレビューを表示（オフで少し軽くなる）" IsChecked="{Binding PreviewEnabled}"
                                   Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+
+                        <!-- ===== トラッキング ===== -->
+                        <TextBlock Text="体とカメラ" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="身長: " /><Run Text="{Binding HeightMeters, StringFormat=F2, Mode=OneWay}" /><Run Text=" m" />
+                        </TextBlock>
+                        <Slider Minimum="1.2" Maximum="2.1" SmallChange="0.01" LargeChange="0.05"
+                                TickFrequency="0.01" IsSnapToTickEnabled="True" Value="{Binding HeightMeters}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="カメラの水平画角: " /><Run Text="{Binding HorizontalFov, StringFormat=F0, Mode=OneWay}" /><Run Text="°" />
+                        </TextBlock>
+                        <Slider Minimum="40" Maximum="120" SmallChange="1" LargeChange="5"
+                                TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding HorizontalFov}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="カメラの傾き（下向きが +）: " /><Run Text="{Binding CameraPitch, StringFormat=F0, Mode=OneWay}" /><Run Text="°" />
+                        </TextBlock>
+                        <Slider Minimum="-45" Maximum="45" SmallChange="1" LargeChange="5"
+                                TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding CameraPitch}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="トラッキングに使う信頼度: " /><Run Text="{Binding TrackingThreshold, StringFormat=F2, Mode=OneWay}" />
+                        </TextBlock>
+                        <Slider Minimum="0.1" Maximum="0.9" SmallChange="0.05" LargeChange="0.1"
+                                Value="{Binding TrackingThreshold}" />
+
+                        <TextBlock Text="平滑化（One Euro Filter）" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Text="min cutoff を下げる → 静止時のブレが減る（遅れる）&#x0a;beta を上げる → 速い動きの遅れが減る（ブレやすい）"
+                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="位置 min cutoff: " /><Run Text="{Binding PositionMinCutoff, StringFormat=F2, Mode=OneWay}" /><Run Text=" Hz" />
+                        </TextBlock>
+                        <Slider Minimum="0.05" Maximum="5" SmallChange="0.05" LargeChange="0.25" Value="{Binding PositionMinCutoff}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="位置 beta: " /><Run Text="{Binding PositionBeta, StringFormat=F2, Mode=OneWay}" />
+                        </TextBlock>
+                        <Slider Minimum="0" Maximum="5" SmallChange="0.05" LargeChange="0.25" Value="{Binding PositionBeta}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="回転 min cutoff: " /><Run Text="{Binding RotationMinCutoff, StringFormat=F2, Mode=OneWay}" /><Run Text=" Hz" />
+                        </TextBlock>
+                        <Slider Minimum="0.05" Maximum="5" SmallChange="0.05" LargeChange="0.25" Value="{Binding RotationMinCutoff}" />
+                        <TextBlock Style="{StaticResource Label}">
+                            <Run Text="回転 beta: " /><Run Text="{Binding RotationBeta, StringFormat=F2, Mode=OneWay}" />
+                        </TextBlock>
+                        <Slider Minimum="0" Maximum="3" SmallChange="0.05" LargeChange="0.25" Value="{Binding RotationBeta}" />
+                        <Button Content="初期値に戻す" Command="{Binding ResetFilterParamsCommand}" Margin="0,8,0,0" Height="26" />
+
+                        <TextBlock Text="VRChat（OSC）" Style="{StaticResource SectionHeader}" />
+                        <CheckBox Content="VRChat に送信する" IsChecked="{Binding OscEnabled}"
+                                  Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                        <CheckBox Content="頭の位置を送る（位置合わせ用）" IsChecked="{Binding SendHeadPosition}"
+                                  Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                        <TextBlock Text="送信先（Quest 単体なら Quest の IP）" Style="{StaticResource Label}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="64" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding OscHost, UpdateSourceTrigger=PropertyChanged}" Height="24" VerticalContentAlignment="Center" />
+                            <TextBox Grid.Column="1" Text="{Binding OscPort, UpdateSourceTrigger=PropertyChanged}" Height="24" Margin="4,0,0,0" VerticalContentAlignment="Center" />
+                            <Button Grid.Column="2" Content="反映" Command="{Binding ApplyOscEndpointCommand}" Margin="4,0,0,0" Padding="10,0" />
+                        </Grid>
+                        <Button Content="向きを合わせる（カメラの方を向いて押す）" Command="{Binding AlignYawCommand}"
+                                Margin="0,10,0,0" Height="30" />
                     </StackPanel>
                 </ScrollViewer>
             </DockPanel>

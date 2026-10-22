@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WebcamFbt.Core\WebcamFbt.Core.csproj" />
+    <ProjectReference Include="..\WebcamFbt.Osc\WebcamFbt.Osc.csproj" />
     <ProjectReference Include="..\WebcamFbt.Vision\WebcamFbt.Vision.csproj" />
   </ItemGroup>
 </Project>

@@ -8,6 +8,14 @@ using WebcamFbt.Vision.Rendering;
 
 namespace WebcamFbt.Vision.Pipeline;
 
+/// <summary>姿勢推定 1 回分の結果。</summary>
+public readonly record struct PoseEstimatedEventArgs(
+    Pose2D? Pose,
+    KeypointLayout Layout,
+    long CapturedTimestamp,
+    int ImageWidth,
+    int ImageHeight);
+
 /// <summary>
 /// カメラ 1 台の処理の流れ（フェーズ 1）。
 ///   [カメラスレッド] → 最新フレーム → [推論スレッド] 姿勢推定・描画 → 最新プレビュー → [UI]
@@ -37,8 +45,11 @@ public sealed class SingleCameraPipeline : IDisposable
     /// <summary>プレビュー画像を作るかどうか（オフにすると描画とコピーの分だけ軽くなる）。</summary>
     public bool PreviewEnabled { get; set; } = true;
 
-    /// <summary>最新の姿勢（フェーズ 2 以降でトラッカー計算に使う）。</summary>
-    public event Action<Pose2D?, long>? PoseEstimated;
+    /// <summary>
+    /// 姿勢を推定するたびに推論スレッドから呼ばれる（人がいなければ Pose は null）。
+    /// トラッカー計算はここで行う。重い処理を書くと推論が遅れるので注意。
+    /// </summary>
+    public event Action<PoseEstimatedEventArgs>? PoseEstimated;
 
     /// <summary>推論スレッドで起きたエラー。</summary>
     public event Action<string>? Error;
@@ -83,7 +94,8 @@ public sealed class SingleCameraPipeline : IDisposable
                 _frameW = frame.Image.Cols;
                 _frameH = frame.Image.Rows;
 
-                PoseEstimated?.Invoke(result.Pose, frame.CapturedTimestamp);
+                PoseEstimated?.Invoke(new PoseEstimatedEventArgs(
+                    result.Pose, _estimator.Layout, frame.CapturedTimestamp, frame.Image.Cols, frame.Image.Rows));
 
                 // 遅延 = カメラでフレームを受け取ってから推論が終わるまで
                 // （カメラ内部・USB 転送の遅延は含まない）

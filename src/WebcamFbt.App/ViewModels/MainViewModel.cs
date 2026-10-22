@@ -19,7 +19,7 @@ public sealed record Choice<T>(string Label, T Value)
 }
 
 /// <summary>
-/// メイン画面の ViewModel（フェーズ 1: カメラ 1 台のプレビューと 2D キーポイント表示）。
+/// メイン画面の ViewModel（カメラ・推論・プレビュー部分）。トラッキングと OSC は MainViewModel.Tracking.cs。
 /// </summary>
 public sealed partial class MainViewModel : ObservableObject, IDisposable
 {
@@ -168,6 +168,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 PreviewEnabled = PreviewEnabled,
             };
             pipeline.Error += msg => PostStatus(msg);
+            StartTracking(pipeline);
 
             try
             {
@@ -177,6 +178,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             catch
             {
                 pipeline.Dispose();
+                StopTracking();
                 throw;
             }
 
@@ -210,6 +212,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _statsTimer.Stop();
         _pipeline?.Dispose();
         _pipeline = null;
+        StopTracking();
         IsRunning = false;
         Status = "停止中";
     }
@@ -256,6 +259,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             $"遅延    {s.LatencyMs,5:F1} ms   (取得→推論完了)\n" +
             $"実行    {s.Provider}\n" +
             $"人物    {(s.PersonFound ? "検出中" : "見つかりません")}";
+        UpdateTrackingText();
     }
 
     public void Dispose()
@@ -263,5 +267,6 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         StopPipeline();
         _estimator?.Dispose();
         _estimator = null;
+        _osc.Dispose();
     }
 }
