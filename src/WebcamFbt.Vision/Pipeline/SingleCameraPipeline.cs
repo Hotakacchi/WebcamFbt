@@ -46,6 +46,17 @@ public sealed class SingleCameraPipeline : IDisposable
     public bool PreviewEnabled { get; set; } = true;
 
     /// <summary>
+    /// 設定されている間は、姿勢推定の代わりにこれを各フレームに対して呼ぶ（推論スレッド。画像に描き込んでよい）。
+    /// チェッカーボードの校正に使う。校正中は位置合わせのためプレビューを常に作る。
+    /// </summary>
+    public Action<Frame>? FrameProcessor
+    {
+        get => _frameProcessor;
+        set => _frameProcessor = value;
+    }
+    private volatile Action<Frame>? _frameProcessor;
+
+    /// <summary>
     /// 姿勢を推定するたびに推論スレッドから呼ばれる（人がいなければ Pose は null）。
     /// トラッカー計算はここで行う。重い処理を書くと推論が遅れるので注意。
     /// </summary>
@@ -85,6 +96,19 @@ public sealed class SingleCameraPipeline : IDisposable
             bool handedOff = false; // 画像の所有権をプレビューに渡したか
             try
             {
+                var processor = _frameProcessor;
+                if (processor != null)
+                {
+                    processor(frame);
+                    _personFound = false;
+                    _frameW = frame.Image.Cols;
+                    _frameH = frame.Image.Rows;
+                    _processRate.Tick();
+                    Preview.Put(new PreviewFrame(frame.Image, null));
+                    handedOff = true;
+                    continue;
+                }
+
                 long t0 = Stopwatch.GetTimestamp();
                 var result = _estimator.Estimate(frame.Image);
                 _totalMs.Add(TimeUtil.ElapsedMsSince(t0));

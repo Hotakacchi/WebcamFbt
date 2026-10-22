@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Numerics;
 using WebcamFbt.Core.Geometry;
 using WebcamFbt.Core.Pose;
 
@@ -21,6 +22,18 @@ public sealed class TrackingProcessor
 
     /// <summary>適用中のキャリブレーション結果（未実施なら <see cref="CalibrationData.None"/>）。</summary>
     public CalibrationData Calibration { get; private set; } = CalibrationData.None;
+
+    /// <summary>
+    /// チェッカーボードで校正したカメラの内部パラメータ（無ければ null）。
+    /// 解像度が合うときだけ、画角による近似の代わりに使い、キーポイントの歪みも補正する。
+    /// UI スレッドから差し替えるので volatile。
+    /// </summary>
+    public CameraCalibration? Intrinsics
+    {
+        get => _intrinsics;
+        set => _intrinsics = value;
+    }
+    private volatile CameraCalibration? _intrinsics;
 
     // キャリブレーション中の状態。UI スレッドと推論スレッドから触るので volatile。
     private volatile Calibrator? _calibrator;
@@ -91,9 +104,15 @@ public sealed class TrackingProcessor
         double time = capturedTimestamp / (double)Stopwatch.Frequency;
         var s = Settings;
 
+        var intrinsics = _intrinsics;
+        bool calibrated = intrinsics is not null && intrinsics.Matches(imageWidth, imageHeight);
+        if (calibrated && pose is not null) pose = Undistort(pose, intrinsics!);
+
         var points = _gate.Apply(pose, layout.Count, time, s.KeypointScoreThreshold, s.KeypointHoldSeconds);
 
-        var camera = CameraIntrinsics.FromHorizontalFov(imageWidth, imageHeight, s.HorizontalFovDeg);
+        var camera = calibrated
+            ? intrinsics!.ToIntrinsics()
+            : CameraIntrinsics.FromHorizontalFov(imageWidth, imageHeight, s.HorizontalFovDeg);
         _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
         var pose3D = _lifter.Lift(points, layout, camera, _toTracking, s, Body, time);
@@ -124,6 +143,19 @@ public sealed class TrackingProcessor
 
         var frame = _solver.Solve(pose3D, time, capturedTimestamp);
         return Calibration.Apply(frame);
+    }
+
+    /// <summary>キーポイントのレンズ歪みを補正した姿勢を作る。</summary>
+    private static Pose2D Undistort(Pose2D pose, CameraCalibration calibration)
+    {
+        var src = pose.Keypoints;
+        var dst = new Keypoint2D[src.Length];
+        for (int i = 0; i < src.Length; i++)
+        {
+            var p = calibration.Undistort(new Vector2(src[i].X, src[i].Y));
+            dst[i] = src[i] with { X = p.X, Y = p.Y };
+        }
+        return new Pose2D(pose.Layout, dst, pose.Box);
     }
 
     /// <summary>平滑化などの内部状態を捨てる（開始し直すとき）。キャリブレーション結果は保持する。</summary>

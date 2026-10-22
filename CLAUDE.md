@@ -41,6 +41,10 @@ dotnet run --project src\WebcamFbt.App -c Release
   - [x] 4a: 実装・コミット済み。**1台モードはユーザー確認済み、2台モードは実機未検証**（ユーザーの Web カメラが 1 台のため）。
     2台目が用意できたら「左右に2映像＋各2D骨格・統計が出るか」を確認し、問題があれば直す
     （カメラ2は MainViewModel.Camera2.cs。別推定器で並行推論、解像度・fps・取得方式はカメラ1と共通、トラッキング/OSC はカメラ1のまま）
+  - [x] 4b: 実装・コミット済み。**カメラ1台での校正はユーザー確認済み、ステレオ校正は実機未検証**（計算は合成データのテストで検算済み）。
+    校正中はパイプラインの `FrameProcessor` でボード検出に切り替え、止まった・十分違う画像を 15 枚（ステレオは組）集めて計算。
+    結果は `%LOCALAPPDATA%\WebcamFbt\calibration.json`（デバイス×解像度ごとの内部パラメータ＋ステレオ 1 組）。
+    カメラ1の内部パラメータは単眼トラッキングにも使う（画角の近似の代わり＋キーポイントの歪み補正）
 - [ ] フェーズ5: 設定の保存、UI の整備、self-contained 単一 exe の配布ビルド
 
 ## 設計の要点（フェーズ2）
@@ -89,7 +93,7 @@ src/WebcamFbt.App     WPF（MainViewModel.cs = カメラ/推論、MainViewModel.
 src/WebcamFbt.Core    Geometry（フィルタ・回転・カメラモデル）、Tracking、Pose、Threading
 src/WebcamFbt.Vision  カメラ、ONNX 推論（YOLOX / RTMPose / TopDownPoseEstimator）、描画、パイプライン
 src/WebcamFbt.Osc     OSC エンコーダと VrcTrackerSender
-tests/WebcamFbt.Core.Tests  xUnit
+tests/WebcamFbt.Core.Tests  xUnit（OpenCV の校正計算も合成データで検算するため Vision を参照し、net10.0-windows）
 ```
 
 注意: 名前空間 `WebcamFbt.Core.Math` は `System.Math` と衝突するので使わない（Geometry にした）。

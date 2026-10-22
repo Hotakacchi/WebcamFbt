@@ -205,7 +205,42 @@
                         <Slider Minimum="0.1" Maximum="0.9" SmallChange="0.05" LargeChange="0.1"
                                 Value="{Binding TrackingThreshold}" />
 
-                        <TextBlock Text="キャリブレーション" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Text="カメラの校正（チェッカーボード）" Style="{StaticResource SectionHeader}" />
+                        <TextBlock Text="印刷したチェッカーボードをカメラに向け、位置と傾きを変えながら毎回少し止めます。2台のときは両方に写る位置で。1マスの大きさは定規で測った値を入れてください。"
+                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                        <Grid IsEnabled="{Binding CanEditBoard}" Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,4,0">
+                                <TextBlock Text="交点（横）" Style="{StaticResource Label}" />
+                                <TextBox Text="{Binding BoardInnerCols}" Height="24" VerticalContentAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="2,0,2,0">
+                                <TextBlock Text="交点（縦）" Style="{StaticResource Label}" />
+                                <TextBox Text="{Binding BoardInnerRows}" Height="24" VerticalContentAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="4,0,0,0">
+                                <TextBlock Text="1マス [mm]" Style="{StaticResource Label}" />
+                                <TextBox Text="{Binding BoardSquareMm}" Height="24" VerticalContentAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="校正を開始" Command="{Binding StartCameraCalibrationCommand}" Height="30" />
+                            <Button Grid.Column="1" Content="中止" Command="{Binding CancelCameraCalibrationCommand}"
+                                    Height="30" Margin="4,0,0,0" Padding="12,0" />
+                        </Grid>
+                        <TextBlock Text="{Binding CameraCalibrationText}" Foreground="{StaticResource SubTextBrush}"
+                                   FontFamily="Consolas, BIZ UDGothic, Meiryo" FontSize="12"
+                                   TextWrapping="Wrap" Margin="0,8,0,0" />
+
+                        <TextBlock Text="体のキャリブレーション（T ポーズ）" Style="{StaticResource SectionHeader}" />
                         <TextBlock Text="カメラの方を向いて T ポーズ（全身が映る位置）で立ち、ボタンを押してください。数秒ぶん測って体の比率・床の高さ・正面方向を合わせます。"
                                    Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
                         <Button Content="キャリブレーション開始" Command="{Binding CalibrateCommand}"

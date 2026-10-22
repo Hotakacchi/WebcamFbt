@@ -209,6 +209,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 }
             }
 
+            LoadCameraCalibration(settings.DeviceIndex, fmt.Width, fmt.Height);
             _previewTimer.Start();
             _statsTimer.Start();
         }
@@ -233,6 +234,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         _previewTimer.Stop();
         _statsTimer.Stop();
+        ResetCameraCalibrationView();
         _pipeline?.Dispose();
         _pipeline = null;
         StopSecondCamera();
@@ -287,6 +289,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             $"人物    {(s.PersonFound ? "検出中" : "見つかりません")}";
         UpdateTrackingText();
         UpdateStats2();
+        UpdateCameraCalibration();
     }
 
     public void Dispose()

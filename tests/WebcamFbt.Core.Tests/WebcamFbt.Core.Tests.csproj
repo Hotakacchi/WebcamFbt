@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- Vision（OpenCV を使う校正計算）も合成データで検算するため、Windows 向けにしている -->
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -18,5 +19,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\WebcamFbt.Core\WebcamFbt.Core.csproj" />
     <ProjectReference Include="..\..\src\WebcamFbt.Osc\WebcamFbt.Osc.csproj" />
+    <ProjectReference Include="..\..\src\WebcamFbt.Vision\WebcamFbt.Vision.csproj" />
   </ItemGroup>
 </Project>
