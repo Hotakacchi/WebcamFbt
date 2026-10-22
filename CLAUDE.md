@@ -67,8 +67,9 @@ dotnet run --project src\WebcamFbt.App -c Release
     腰・両足・頭・OSC の色付き状態表示、上から見たトラッカーの図（`Views/TrackerTopDownView`）
   - [x] 5c: 実装・コミット済み。`scripts\build-release.ps1` でテスト→単一 exe（SingleFile.pubxml）→ Inno Setup（installer\WebcamFbt.iss）。
     DirectML.dll は App から Microsoft.AI.DirectML を直接参照して同梱（以前は同梱されず Windows のものが使われていた）。
-    アイコンは scripts\make-icon.ps1。.iss と .ps1 は BOM 付き UTF-8 にする。
-    **残り: GitHub Releases への v0.1.0 のアップロード（未実施）**、利用者データが %LOCALAPPDATA% のどこに保存されているかの確認
+    アイコンはユーザー提供の絵（Assets\icon-source.png）から scripts\make-icon.ps1 で作る（白い余白を角丸で切り抜いて透明に）。
+    .iss と .ps1 は BOM 付き UTF-8 にする。v0.1.0 を GitHub Releases にプレリリースとして公開（ステレオは実機未検証のため）。
+    確認待ち: 利用者データ（settings.json など）が %LOCALAPPDATA%\WebcamFbt に保存されているか（Claude のシェルからは見えなかった）
 
 ## 設計の要点（フェーズ2）
 
