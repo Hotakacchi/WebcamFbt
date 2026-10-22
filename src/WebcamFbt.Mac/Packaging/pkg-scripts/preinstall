@@ -1,8 +1,22 @@
 #!/bin/sh
-# インストールの前に、前の版の WebcamFbt.app を消す（古いファイルが残って混ざらないように）。
+# インストールの前に、今までの WebcamFbt を終了させてから WebcamFbt.app を消す
+# （新しい版で丸ごと置き換えるため。古いファイルが残って混ざらないように）。
 # 設定やモデルは ~/Library/Application Support/WebcamFbt にあるので消えない。
 # $2 = インストール先（/Applications）
 APP="$2/WebcamFbt.app"
+EXE="$APP/Contents/MacOS/WebcamFbt"
+
+# 動いていたら終了させる（まず普通に終了を頼み、5 秒たっても残っていれば強制終了）
+if pgrep -f "$EXE" >/dev/null 2>&1; then
+    pkill -TERM -f "$EXE" 2>/dev/null
+    i=0
+    while pgrep -f "$EXE" >/dev/null 2>&1 && [ $i -lt 10 ]; do
+        sleep 0.5
+        i=$((i + 1))
+    done
+    pkill -KILL -f "$EXE" 2>/dev/null
+fi
+
 if [ -d "$APP" ]; then
     rm -rf "$APP"
 fi

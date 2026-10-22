@@ -67,6 +67,33 @@ jobs:
             exit 1
           fi
 
+      # 今までの版が入っていて、しかも起動中のところに入れ直しても、丸ごと置き換わるか
+      - name: 上書きインストールを確かめる
+        run: |
+          PKG="$(ls artifacts/release/WebcamFbt-*-mac.pkg)"
+          APP=/Applications/WebcamFbt.app
+          # 「前の版にだけあったファイル」の代わり
+          sudo touch "$APP/Contents/MacOS/old-version-only.txt"
+          "$APP/Contents/MacOS/WebcamFbt" &
+          PID=$!
+          sleep 10
+          kill -0 "$PID"
+          sudo installer -pkg "$PKG" -target /
+          sleep 1
+          # 終了したプロセスは回収されるまでゾンビ（状態 Z）として残るので、状態で見る
+          STAT="$(ps -o stat= -p "$PID" || true)"
+          case "$STAT" in
+            ''|Z*) echo "前のアプリは終了しました" ;;
+            *) echo "インストール後も前のアプリが動いたままです（$STAT）"; exit 1 ;;
+          esac
+          if [ -e "$APP/Contents/MacOS/old-version-only.txt" ]; then
+            echo "前の版のファイルが残っています"; exit 1
+          fi
+          test -x "$APP/Contents/MacOS/WebcamFbt"
+          codesign --verify --deep --strict "$APP"
+          pkgutil --pkg-info io.github.hotakacchi.webcamfbt.arm64
+          echo "上書きインストール OK"
+
       - uses: actions/upload-artifact@v4
         with:
           name: WebcamFbt-mac-pkg

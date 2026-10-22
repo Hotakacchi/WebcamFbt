@@ -56,9 +56,15 @@ for ARCH in arm64 x64; do
     codesign --force --deep --sign - "$APP"
     codesign --verify --deep --strict "$APP"
 
-    # 既に別の場所に同じアプリがあっても、そちらを上書きせず /Applications に入れる
+    # 新しい版（同じ版・古い版でも）を入れたら、今までの /Applications/WebcamFbt.app を置き換える
+    #  - BundleIsRelocatable=NO: 別の場所に同じアプリがあっても、そちらに入れず /Applications に入れる
+    #  - BundleIsVersionChecked=NO: 入っている方が新しくても飛ばさない（飛ばされると preinstall で消した後に何も入らない）
+    #  - BundleOverwriteAction=upgrade: 中身を丸ごと入れ替える（新しい版に無いファイルは残らない）
     pkgbuild --analyze --root "$STAGE" "$WORK/component-$ARCH.plist"
     plutil -replace 0.BundleIsRelocatable -bool NO "$WORK/component-$ARCH.plist"
+    plutil -replace 0.BundleIsVersionChecked -bool NO "$WORK/component-$ARCH.plist"
+    plutil -replace 0.BundleOverwriteAction -string upgrade "$WORK/component-$ARCH.plist"
+    plutil -p "$WORK/component-$ARCH.plist"
 
     pkgbuild --root "$STAGE" \
         --component-plist "$WORK/component-$ARCH.plist" \

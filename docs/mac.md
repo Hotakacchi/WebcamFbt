@@ -38,7 +38,12 @@ Windows 版（`src/WebcamFbt.App`、WPF）はそのまま残し、Avalonia の�
   `productbuild` で 1 つの `WebcamFbt-<版>-mac.pkg` に
   - 中身は Apple Silicon 用と Intel 用の 2 つ。`distribution.xml` の JavaScript（`hw.optional.arm64`）で Mac のチップに合う方だけ入れる
   - `hostArchitectures="x86_64,arm64"` が無いと、Apple Silicon で Rosetta のインストールを求められる
-  - preinstall で前の版の .app を消す（設定・モデルは Application Support なので残る）。postinstall で quarantine を外す
+  - 新しい版を入れると、今までの /Applications/WebcamFbt.app を丸ごと置き換える（同じ版・古い版を入れ直しても同じ）
+    - preinstall: 動いている WebcamFbt を終了させ（TERM → 5 秒後に KILL）、前の .app を消す。設定・モデルは Application Support なので残る
+    - component plist: BundleIsRelocatable=NO（別の場所のコピーに入れない）、BundleIsVersionChecked=NO
+      （入っている方が新しくても飛ばさない。飛ばすと preinstall で消した後に何も入らない）、BundleOverwriteAction=upgrade
+    - postinstall で quarantine を外す
+    - CI で「起動中＋前の版にだけあるファイルがある」状態から入れ直し、終了・置き換えを確かめている
   - 最低 macOS は 13.4（ONNX Runtime 1.23.2 の dylib の要求。.NET 10 の公式サポートは 15 以降）
 - ワークフローの自動チェック: 各 .app の `--self-test`（OpenCV の AVFoundation 有無、モデルのダウンロード、CPU と CoreML で
   推論して結果の差を表示。Intel 用は Rosetta で）→ `sudo installer` で実際にインストールして署名を検証・自己診断 →
