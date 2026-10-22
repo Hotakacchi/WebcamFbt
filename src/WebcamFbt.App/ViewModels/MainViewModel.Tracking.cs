@@ -8,7 +8,9 @@ using WebcamFbt.Vision.Pipeline;
 namespace WebcamFbt.App.ViewModels;
 
 /// <summary>
-/// メイン画面の ViewModel のうち、トラッカー計算と OSC 送信に関わる部分（フェーズ 2）。
+/// メイン画面の ViewModel のうち、トラッカー計算と OSC 送信に関わる部分（フェーズ 2、ステレオはフェーズ 4c）。
+/// 1 台のときはカメラ 1 の推論スレッドで単眼の 3D 化をする。2 台でステレオ校正があるときは、
+/// 両カメラの結果を撮影時刻で組にして三角測量する（組ができたスレッドで処理する）。
 /// </summary>
 public sealed partial class MainViewModel
 {
@@ -17,6 +19,15 @@ public sealed partial class MainViewModel
     private readonly VrcTrackerSender _osc = new();
     private volatile TrackerFrame? _lastTrackerFrame;
     private volatile bool _oscEnabledFlag = true;
+
+    // ---- ステレオ ----
+    private readonly StereoFrameMatcher _stereoMatcher = new();
+    // 2 台のときは 2 本の推論スレッドから TrackingProcessor を呼ぶので直列化する（切替の瞬間に単眼とステレオが重なる場合も）
+    private readonly object _trackingLock = new();
+    private volatile bool _stereoActive;
+
+    /// <summary>2 台のとき三角測量で 3D 化する（オフにするとカメラ 1 の単眼で動く）。実行中に切り替えられる。</summary>
+    [ObservableProperty] private bool _useStereoTracking = true;
 
     // ---- 体とカメラ ----
     [ObservableProperty] private double _heightMeters = 1.65;
@@ -132,16 +143,64 @@ public sealed partial class MainViewModel
     private void StopTracking()
     {
         _osc.Stop();
+        _stereoActive = false;
+        _stereoMatcher.Reset();
         _lastTrackerFrame = null;
         TrackingText = "";
     }
 
-    /// <summary>推論スレッドから呼ばれる。トラッカーを計算して OSC スレッドに渡す。</summary>
+    partial void OnUseStereoTrackingChanged(bool value) => UpdateTrackingMode();
+
+    /// <summary>
+    /// 単眼とステレオのどちらで動かすかを決め直す（UI スレッド）。
+    /// 2 台で動いていて、ステレオ校正があり、三角測量がオンのときだけステレオにする。
+    /// </summary>
+    private void UpdateTrackingMode()
+    {
+        var tracking = _tracking;
+        if (tracking != null) tracking.Stereo = _stereoCalibration;
+        bool active = _pipeline2 != null && UseStereoTracking && _stereoCalibration != null;
+        if (active == _stereoActive) return;
+        _stereoActive = active;
+        _stereoMatcher.Reset();
+        tracking?.RequestReset();
+    }
+
+    /// <summary>カメラ 1 の推論スレッドから呼ばれる。トラッカーを計算して OSC スレッドに渡す。</summary>
     private void OnPoseEstimated(PoseEstimatedEventArgs e)
+    {
+        if (_stereoActive)
+        {
+            SubmitStereo(0, e);
+            return;
+        }
+        var tracking = _tracking;
+        if (tracking == null) return;
+        TrackerFrame? frame;
+        lock (_trackingLock) frame = tracking.Process(e.Pose, e.Layout, e.CapturedTimestamp, e.ImageWidth, e.ImageHeight);
+        Publish(frame);
+    }
+
+    /// <summary>カメラ 2 の推論スレッドから呼ばれる（ステレオのときだけ使う）。</summary>
+    private void OnPoseEstimated2(PoseEstimatedEventArgs e)
+    {
+        if (_stereoActive) SubmitStereo(1, e);
+    }
+
+    /// <summary>相手のカメラの結果と組になったら三角測量する。</summary>
+    private void SubmitStereo(int camera, PoseEstimatedEventArgs e)
     {
         var tracking = _tracking;
         if (tracking == null) return;
-        var frame = tracking.Process(e.Pose, e.Layout, e.CapturedTimestamp, e.ImageWidth, e.ImageHeight);
+        var view = new StereoView(e.Pose, e.CapturedTimestamp, e.ImageWidth, e.ImageHeight);
+        if (!_stereoMatcher.TrySubmit(camera, view, out var view1, out var view2)) return;
+        TrackerFrame? frame;
+        lock (_trackingLock) frame = tracking.ProcessStereo(view1, view2, e.Layout);
+        Publish(frame);
+    }
+
+    private void Publish(TrackerFrame? frame)
+    {
         _lastTrackerFrame = frame;
         if (frame != null && _oscEnabledFlag) _osc.Submit(frame);
     }
@@ -154,9 +213,11 @@ public sealed partial class MainViewModel
         var sb = new StringBuilder();
         sb.AppendLine($"OSC     {(OscEnabled ? $"{_osc.SendRate.Rate,5:F0} fps → {_osc.Endpoint}" : "送信オフ")}");
         if (_osc.LastError != null) sb.AppendLine($"OSC エラー: {_osc.LastError}");
+        sb.AppendLine($"方式    {(_stereoActive ? "ステレオ（三角測量）" : "単眼")}");
         if (frame == null)
         {
-            sb.Append("トラッカー: 体が見えていません");
+            var problem = _stereoActive ? _tracking?.StereoProblem : null;
+            sb.Append(problem != null ? $"トラッカー: {problem}" : "トラッカー: 体が見えていません");
         }
         else
         {

@@ -10,8 +10,8 @@ namespace WebcamFbt.App.ViewModels;
 
 /// <summary>
 /// メイン画面の ViewModel のうち、2 台目のカメラに関わる部分（フェーズ 4a）。
-/// 4a の時点では三角測量はせず、2 台を同時にプレビューして各カメラの 2D 推定を表示するだけ。
-/// トラッキング・OSC はカメラ 1（単眼）で従来どおり動く。
+/// 2 台を同時にプレビューして各カメラの 2D 推定を表示する。ステレオ校正があれば、
+/// カメラ 2 の推定結果も三角測量に使う（MainViewModel.Tracking.cs、フェーズ 4c）。
 /// </summary>
 public sealed partial class MainViewModel
 {
@@ -65,6 +65,7 @@ public sealed partial class MainViewModel
             PreviewEnabled = PreviewEnabled,
         };
         pipeline.Error += msg => PostStatus(msg);
+        pipeline.PoseEstimated += OnPoseEstimated2;
 
         try
         {

@@ -87,6 +87,7 @@ public sealed partial class MainViewModel
         _camera1Calibration = _calibrationStore.GetCamera(device1, width, height);
         _stereoCalibration = _pipeline2 != null ? _calibrationStore.GetStereo(device1, SelectedCamera2.Value) : null;
         if (_tracking != null) _tracking.Intrinsics = _camera1Calibration;
+        UpdateTrackingMode();
         CameraCalibrationText = DescribeCameraCalibration();
     }
 
@@ -136,6 +137,7 @@ public sealed partial class MainViewModel
                 _calibrationStore.SaveStereo(stereo);
                 _stereoCalibration = stereo;
                 ApplyCamera1Calibration(stereo.Camera1);
+                UpdateTrackingMode();
                 Status = $"ステレオ校正が完了しました（基線 {stereo.BaselineMeters:F2} m、誤差 {stereo.ReprojErrorPx:F2} px）";
             }
             else

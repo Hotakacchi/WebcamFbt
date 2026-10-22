@@ -184,6 +184,9 @@
 
                         <!-- ===== トラッキング ===== -->
                         <TextBlock Text="体とカメラ" Style="{StaticResource SectionHeader}" />
+                        <CheckBox Content="2台のときは三角測量で3D化する（ステレオ校正が必要）" IsChecked="{Binding UseStereoTracking}"
+                                  Visibility="{Binding TwoCameraMode, Converter={StaticResource BoolToVisibility}}"
+                                  Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
                         <TextBlock Style="{StaticResource Label}">
                             <Run Text="身長: " /><Run Text="{Binding HeightMeters, StringFormat=F2, Mode=OneWay}" /><Run Text=" m" />
                         </TextBlock>

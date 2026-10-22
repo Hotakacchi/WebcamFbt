@@ -22,6 +22,9 @@ public sealed class TrackingSettings
     /// <summary>信頼度が低いキーポイントについて、直前の値を使い続ける最大時間 [秒]。</summary>
     public double KeypointHoldSeconds { get; set; } = 0.5;
 
+    /// <summary>ステレオで、再投影誤差がこれ [px] より大きい関節は捨てる（2 台で別の点を指している）。</summary>
+    public double StereoMaxReprojErrorPx { get; set; } = 15;
+
     /// <summary>位置の平滑化。</summary>
     public OneEuroParams PositionFilter { get; } = new(minCutoff: 1.5, beta: 1.0);
 

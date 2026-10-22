@@ -6,16 +6,19 @@ using WebcamFbt.Core.Pose;
 namespace WebcamFbt.Core.Tracking;
 
 /// <summary>
-/// 2D の推定結果からトラッカーを求めるまでの処理をまとめたもの（カメラ 1 台用）。
-///   2D キーポイント → 信頼度ゲート → 3D 化 → トラッカー計算・平滑化
-/// 推論スレッドから呼ぶ（スレッドセーフではない）。
+/// 2D の推定結果からトラッカーを求めるまでの処理をまとめたもの。
+///   単眼（<see cref="Process"/>）:       2D キーポイント → 信頼度ゲート → 単眼の 3D 化 → トラッカー計算・平滑化
+///   ステレオ（<see cref="ProcessStereo"/>）: 2 台の 2D キーポイント → 信頼度ゲート → 三角測量 → トラッカー計算・平滑化
+/// 推論スレッドから呼ぶ（スレッドセーフではない。2 台のときは呼び出し側で直列化する）。
 /// </summary>
 public sealed class TrackingProcessor
 {
     private readonly KeypointGate _gate = new();
+    private readonly KeypointGate _gate2 = new();
     private readonly MonocularLifter _lifter = new();
     private readonly TrackerSolver _solver;
     private readonly CameraToTracking _toTracking = new();
+    private volatile bool _resetRequested;
 
     public TrackingSettings Settings { get; }
     public BodyProportions Body { get; set; } = BodyProportions.Default;
@@ -34,6 +37,22 @@ public sealed class TrackingProcessor
         set => _intrinsics = value;
     }
     private volatile CameraCalibration? _intrinsics;
+
+    /// <summary>ステレオの校正結果（無ければ null）。<see cref="ProcessStereo"/> で使う。UI スレッドから差し替える。</summary>
+    public StereoCalibration? Stereo
+    {
+        get => _stereo;
+        set => _stereo = value;
+    }
+    private volatile StereoCalibration? _stereo;
+
+    /// <summary>直近の <see cref="ProcessStereo"/> で三角測量できなかった理由（表示用。問題なければ null）。</summary>
+    public string? StereoProblem
+    {
+        get => _stereoProblem;
+        private set => _stereoProblem = value;
+    }
+    private volatile string? _stereoProblem;
 
     // キャリブレーション中の状態。UI スレッドと推論スレッドから触るので volatile。
     private volatile Calibrator? _calibrator;
@@ -101,6 +120,7 @@ public sealed class TrackingProcessor
     /// <param name="capturedTimestamp">フレームの取得時刻（Stopwatch のタイムスタンプ）。</param>
     public TrackerFrame? Process(Pose2D? pose, KeypointLayout layout, long capturedTimestamp, int imageWidth, int imageHeight)
     {
+        ApplyPendingReset();
         double time = capturedTimestamp / (double)Stopwatch.Frequency;
         var s = Settings;
 
@@ -116,7 +136,54 @@ public sealed class TrackingProcessor
         _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
         var pose3D = _lifter.Lift(points, layout, camera, _toTracking, s, Body, time);
-        if (pose3D is null) return null;
+        return pose3D is null ? null : Finish(pose3D, time, capturedTimestamp);
+    }
+
+    /// <summary>
+    /// 2 台のカメラの組を処理する（三角測量）。校正が無い・解像度が合わない・使える関節がない場合は null。
+    /// </summary>
+    /// <param name="view1">カメラ 1 の推定結果。</param>
+    /// <param name="view2">カメラ 2 の推定結果（撮影時刻が近いもの）。</param>
+    public TrackerFrame? ProcessStereo(StereoView view1, StereoView view2, KeypointLayout layout)
+    {
+        ApplyPendingReset();
+        var s = Settings;
+        var stereo = _stereo;
+        if (stereo is null)
+        {
+            StereoProblem = "ステレオ校正がありません";
+            return null;
+        }
+        if (!stereo.Camera1.Matches(view1.ImageWidth, view1.ImageHeight) || !stereo.Camera2.Matches(view2.ImageWidth, view2.ImageHeight))
+        {
+            StereoProblem = "解像度が校正したときと違います";
+            return null;
+        }
+
+        // 2 台のうち後に撮った方の時刻を、この組の時刻とする
+        long timestamp = System.Math.Max(view1.CapturedTimestamp, view2.CapturedTimestamp);
+        double time = timestamp / (double)Stopwatch.Frequency;
+        var points1 = _gate.Apply(view1.Pose, layout.Count, time, s.KeypointScoreThreshold, s.KeypointHoldSeconds);
+        var points2 = _gate2.Apply(view2.Pose, layout.Count, time, s.KeypointScoreThreshold, s.KeypointHoldSeconds);
+        _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
+
+        var pose3D = StereoTriangulator.Triangulate(points1, points2, layout, stereo, _toTracking, s.StereoMaxReprojErrorPx);
+        if (pose3D is null)
+        {
+            StereoProblem = "2 台に共通して写っている関節がありません";
+            return null;
+        }
+        StereoProblem = null;
+        return Finish(pose3D, time, timestamp);
+    }
+
+    /// <summary>
+    /// 3D の姿勢からトラッカーを求める（単眼・ステレオ共通の後段）。
+    /// 体のキャリブレーション中ならこの姿勢を取り込み、床の高さ・向きの補正をかけて返す。
+    /// </summary>
+    private TrackerFrame Finish(Pose3D pose3D, double time, long capturedTimestamp)
+    {
+        var s = Settings;
 
         // キャリブレーション中なら、この姿勢を取り込み、目標フレーム数に達したら確定する
         var cal = _calibrator;
@@ -161,9 +228,28 @@ public sealed class TrackingProcessor
     /// <summary>平滑化などの内部状態を捨てる（開始し直すとき）。キャリブレーション結果は保持する。</summary>
     public void Reset()
     {
+        ResetFilters();
+        CancelCalibration();
+    }
+
+    /// <summary>
+    /// 次のフレームの処理の前に、平滑化などの内部状態を捨てるよう頼む（UI スレッドから）。
+    /// 単眼とステレオを切り替えたとき、推定方法の違いで位置が飛ぶのをフィルタが引きずらないようにする。
+    /// </summary>
+    public void RequestReset() => _resetRequested = true;
+
+    private void ApplyPendingReset()
+    {
+        if (!_resetRequested) return;
+        _resetRequested = false;
+        ResetFilters();
+    }
+
+    private void ResetFilters()
+    {
         _gate.Reset();
+        _gate2.Reset();
         _lifter.Reset();
         _solver.Reset();
-        CancelCalibration();
     }
 }

@@ -45,6 +45,11 @@ dotnet run --project src\WebcamFbt.App -c Release
     校正中はパイプラインの `FrameProcessor` でボード検出に切り替え、止まった・十分違う画像を 15 枚（ステレオは組）集めて計算。
     結果は `%LOCALAPPDATA%\WebcamFbt\calibration.json`（デバイス×解像度ごとの内部パラメータ＋ステレオ 1 組）。
     カメラ1の内部パラメータは単眼トラッキングにも使う（画角の近似の代わり＋キーポイントの歪み補正）
+  - [x] 4c: 実装・コミット済み。**1台モードは確認済み、ステレオの経路は実機未検証**（合成データのテストで検算済み）。
+    2台＋ステレオ校正あり＋「三角測量で3D化」オンで自動的にステレオ。`StereoFrameMatcher` で撮影時刻差 25ms 以内を組にし、
+    `TrackingProcessor.ProcessStereo` → `StereoTriangulator`（歪み補正→線形三角測量、再投影誤差 15px 超は捨てる）→ 単眼と共通の後段。
+    2本の推論スレッドから呼ぶので VM 側で lock。切替時は `RequestReset` でフィルタをリセット。
+    弱点: 横並びの2台では「同じ高さの左右」を片方のカメラだけ取り違えても見分けられない（左右で高さが違うときだけ入れ替えで直す）
 - [ ] フェーズ5: 設定の保存、UI の整備、self-contained 単一 exe の配布ビルド
 
 ## 設計の要点（フェーズ2）
