@@ -317,7 +317,7 @@
                                 <Slider Minimum="40" Maximum="120" SmallChange="1" LargeChange="5"
                                         TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding HorizontalFov}" />
                                 <TextBlock Classes="Label">
-                                    <Run Text="カメラの傾き（下向きが +）: " /><Run Text="{Binding CameraPitch, StringFormat=F0}" /><Run Text="°" />
+                                    <Run Text="カメラの傾き（下向きが +。体のキャリブレーション後は推定値を使う）: " /><Run Text="{Binding CameraPitch, StringFormat=F0}" /><Run Text="°" />
                                 </TextBlock>
                                 <Slider Minimum="-45" Maximum="45" SmallChange="1" LargeChange="5"
                                         TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding CameraPitch}" />
@@ -328,8 +328,10 @@
                                         Value="{Binding TrackingThreshold}" />
 
                                 <TextBlock Text="体のキャリブレーション（T ポーズ）" Classes="SectionHeader" />
-                                <TextBlock Text="カメラの方を向いて T ポーズ（全身が映る位置）で立ち、ボタンを押してください。数秒ぶん測って体の比率・床の高さ・正面方向を合わせます。"
+                                <TextBlock Text="カメラの置き方: 腰の高さ（床から 0.8〜1 m）に、ほぼ水平に置き、2.5〜3 m 離れて画面の中央に立ちます。頭の上と足元に余白が残るようにしてください。"
                                            Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" />
+                                <TextBlock Text="カメラの方を向いて T ポーズ（全身が映る位置）で立ち、ボタンを押してください。数秒ぶん測って体の比率と、カメラの高さ・傾き（床の位置）を求めます。カメラを動かしたらやり直してください。"
+                                           Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,4,0,0" />
                                 <Button Classes="Wide" Content="キャリブレーション開始" Command="{Binding CalibrateCommand}"
                                         Margin="0,8,0,0" Height="30" />
                                 <Button Classes="Wide" Content="解除（既定値に戻す）" Command="{Binding ClearCalibrationCommand}"
