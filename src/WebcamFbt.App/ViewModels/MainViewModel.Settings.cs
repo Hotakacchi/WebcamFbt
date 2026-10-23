@@ -31,6 +31,9 @@ public sealed partial class MainViewModel
         nameof(OscEnabled), nameof(SendHeadPosition),
         nameof(BoardInnerCols), nameof(BoardInnerRows), nameof(BoardSquareMm),
         nameof(CheckForUpdates),
+#if WINDOWS
+        nameof(AutoStartWithSteamVr), // Mac には SteamVR が無い
+#endif
     ];
 
     private readonly AppSettingsStore _settingsStore = new();
@@ -133,6 +136,9 @@ public sealed partial class MainViewModel
         CheckForUpdates = s.CheckForUpdates;
         _skippedUpdateVersion = s.SkippedUpdateVersion;
         _lastUpdateCheckUtc = s.LastUpdateCheckUtc;
+#if WINDOWS
+        AutoStartWithSteamVr = s.AutoStartWithSteamVr;
+#endif
     }
 
     private AppSettings BuildSettings() => new()
@@ -168,6 +174,9 @@ public sealed partial class MainViewModel
         CheckForUpdates = CheckForUpdates,
         SkippedUpdateVersion = _skippedUpdateVersion,
         LastUpdateCheckUtc = _lastUpdateCheckUtc,
+#if WINDOWS
+        AutoStartWithSteamVr = AutoStartWithSteamVr,
+#endif
     };
 
     private void OnSettingPropertyChanged(object? sender, PropertyChangedEventArgs e)

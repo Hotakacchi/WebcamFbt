@@ -324,6 +324,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        StopSteamVrWatch();
         SaveSettingsNow();
         StopPipeline();
         _estimator?.Dispose();

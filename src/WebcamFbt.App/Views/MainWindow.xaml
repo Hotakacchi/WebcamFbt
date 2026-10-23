@@ -520,6 +520,12 @@
                         </Grid>
                         <Button Content="向きを合わせる（カメラの方を向いて押す）" Command="{Binding AlignYawCommand}"
                                 Margin="0,10,0,0" Height="30" />
+
+                        <TextBlock Text="SteamVR" Style="{StaticResource SectionHeader}" />
+                        <CheckBox Content="SteamVR の起動・終了に合わせて自動で開始・停止する" IsChecked="{Binding AutoStartWithSteamVr}"
+                                  Foreground="{StaticResource TextBrush}" Margin="0,6,0,0" />
+                        <TextBlock Text="WebcamFbt を起動しておく（× で閉じてもタスクトレイで動き続けます）と、SteamVR が起動したときに開始し、終了したときに停止します。手で開始したものは、SteamVR が起動していなければ止めません。"
+                                   Foreground="{StaticResource SubTextBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,2,0,0" />
                     </StackPanel>
                 </ScrollViewer>
                 </TabItem>

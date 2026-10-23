@@ -62,6 +62,9 @@ public sealed class AppSettings
 
     /// <summary>最後に確認できた日時（UTC）。1 日に 1 回だけ問い合わせるため。</summary>
     public DateTime? LastUpdateCheckUtc { get; set; }
+
+    /// <summary>SteamVR が起動したら自動で開始し、終了したら停止する（Windows 版だけ）。</summary>
+    public bool AutoStartWithSteamVr { get; set; }
 }
 
 /// <summary>
