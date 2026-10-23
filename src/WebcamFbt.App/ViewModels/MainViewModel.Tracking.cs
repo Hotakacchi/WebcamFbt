@@ -230,6 +230,11 @@ public sealed partial class MainViewModel
             var leg = st.LegLengthDiffMeters is { } d ? $"  脚の長さ差 {d * 100,3:F0}cm" : "";
             sb.AppendLine($"精度    {st.Triangulated,2}/{st.Candidates,2}点  誤差 {st.MeanReprojErrorPx,4:F1}px{leg}{(st.Swapped ? "  左右入替" : "")}");
         }
+        if (!_stereoActive && _tracking?.SetupWarnings is { Count: > 0 } setup)
+        {
+            // カメラの置き方・立ち位置の注意（しばらく続いたものだけ）
+            foreach (var w in setup) sb.AppendLine($"⚠ {w}");
+        }
         if (frame == null)
         {
             var problem = _stereoActive ? _tracking?.StereoProblem : null;
@@ -290,9 +295,18 @@ public sealed partial class MainViewModel
         var b = cal.Body;
         var sb = new StringBuilder();
         sb.AppendLine("キャリブレーション済み");
+        if (cal.Camera is { } cam)
+        {
+            sb.AppendLine($"カメラの置き方 高さ {cam.HeightMeters:F2} m  下向き {cam.PitchDownDeg:F0}°（立ち姿から推定。カメラを動かしたらやり直してください）");
+        }
+        else if (cal.Tilt is null)
+        {
+            sb.AppendLine("古い方式のキャリブレーションです。精度が上がったので、やり直してください");
+        }
         if (cal.HasFloor) sb.AppendLine($"床の高さ {cal.FloorY,5:F2} m   正面補正 {cal.YawOffsetDeg,4:F0}°");
         if (cal.Tilt is not null) sb.AppendLine($"カメラの傾き補正 {cal.TiltDeg,4:F1}°（ステレオで測定。この後カメラの傾きの設定は変えないでください）");
         sb.Append($"比率 肩{b.ShoulderWidth:F2} 腰{b.HipWidth:F2} 胴{b.Torso:F2} 腿{b.Thigh:F2} すね{b.Shin:F2} 足{b.Foot:F2}");
+        foreach (var w in cal.Warnings ?? Array.Empty<string>()) sb.Append($"\n⚠ {w}");
         return sb.ToString();
     }
 }

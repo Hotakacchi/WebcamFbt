@@ -1,4 +1,5 @@
 using System.Numerics;
+using WebcamFbt.Core.Geometry;
 using WebcamFbt.Core.Pose;
 
 namespace WebcamFbt.Core.Tracking;
@@ -36,16 +37,48 @@ public sealed class Calibrator
     private readonly List<Vector3> _up = new();
     private readonly List<double> _yaw = new();
     private int _stereoFrames;
+    private readonly List<KeypointGate.GatedPoint[]> _points2D = new();
+
+    /// <summary>
+    /// 測った比率がこの範囲（身長に対する比）から外れていたら、測り損ねとみなして既定値を使う。
+    /// 人の体の個人差より十分広く取ってある。
+    /// </summary>
+    private static readonly (string Name, Func<BodyProportions, double> Get, double Min, double Max)[] PlausibleRanges =
+    [
+        ("肩幅", b => b.ShoulderWidth, 0.15, 0.32),
+        ("腰幅", b => b.HipWidth, 0.08, 0.22),
+        ("胴", b => b.Torso, 0.24, 0.38),
+        ("太もも", b => b.Thigh, 0.19, 0.31),
+        ("すね", b => b.Shin, 0.19, 0.31),
+        ("足", b => b.Foot, 0.10, 0.19),
+        ("首〜耳", b => b.NeckToEars, 0.04, 0.13),
+    ];
 
     /// <summary>取り込んだフレーム数。</summary>
     public int FrameCount { get; private set; }
 
+    /// <summary>単眼のときに取り込んだ 2D キーポイント（カメラの置き方を求めて測り直すのに使う）。</summary>
+    public IReadOnlyList<KeypointGate.GatedPoint[]> Points2D => _points2D;
+
+    /// <summary>2D キーポイントの並び（単眼のとき）。</summary>
+    public KeypointLayout? Layout2D { get; private set; }
+
+    /// <summary>2D キーポイントを撮ったカメラ（単眼のとき）。</summary>
+    public CameraIntrinsics Camera2D { get; private set; }
+
     /// <summary>1 フレーム分の姿勢を取り込む。使える骨だけ記録する。</summary>
     /// <param name="stereo">三角測量で求めた姿勢か（傾きはステレオのときだけ求める）。</param>
-    public void Add(Pose3D pose, bool stereo = false)
+    /// <param name="mono">単眼のときの元の 2D キーポイント（信頼度ゲート後）と、その並び・カメラ。</param>
+    public void Add(Pose3D pose, bool stereo = false, (KeypointGate.GatedPoint[] Points, KeypointLayout Layout, CameraIntrinsics Camera)? mono = null)
     {
         FrameCount++;
         if (stereo) _stereoFrames++;
+        if (mono is { } m)
+        {
+            _points2D.Add((KeypointGate.GatedPoint[])m.Points.Clone());
+            Layout2D = m.Layout;
+            Camera2D = m.Camera;
+        }
 
         if (Neck(pose, out var neck))
         {
@@ -97,7 +130,7 @@ public sealed class Calibrator
         double Ratio(List<double> samples, double fallback)
             => samples.Count > 0 ? Median(samples) / heightMeters : fallback;
 
-        var body = new BodyProportions(
+        var measured = new BodyProportions(
             ShoulderWidth: Ratio(_shoulderWidth, d.ShoulderWidth),
             HipWidth: Ratio(_hipWidth, d.HipWidth),
             Torso: Ratio(_torso, d.Torso),
@@ -105,6 +138,8 @@ public sealed class Calibrator
             Shin: Ratio(_shin, d.Shin),
             Foot: Ratio(_foot, d.Foot),
             NeckToEars: Ratio(_neckToEars, d.NeckToEars));
+        var warnings = new List<string>();
+        var body = CheckPlausible(measured, warnings);
 
         // 傾き（全フレームがステレオのときだけ）。体の縦の向きの平均を真上に重ねる最小の回転
         Quaternion? tilt = null;
@@ -142,7 +177,34 @@ public sealed class Calibrator
         {
             yaw = _yaw.Count > 0 ? Median(_yaw) : 0;
         }
-        return new CalibrationData(body, floorY, yaw, tilt);
+        return new CalibrationData(body, floorY, yaw, tilt, Warnings: warnings);
+    }
+
+    /// <summary>
+    /// 測った比率を確かめ、ありえない値（立ち方やカメラの置き方で測り損ねたもの）は既定値に戻す。
+    /// 戻したものは <paramref name="warnings"/> に書く。すべて範囲内なら元のインスタンスを返す。
+    /// </summary>
+    public static BodyProportions CheckPlausible(BodyProportions measured, List<string> warnings)
+    {
+        var d = BodyProportions.Default;
+        var bad = new List<string>();
+        foreach (var (name, get, min, max) in PlausibleRanges)
+        {
+            double v = get(measured);
+            if (!double.IsFinite(v) || v < min || v > max) bad.Add($"{name} {v:F2}");
+        }
+        if (bad.Count == 0) return measured;
+        warnings.Add($"測った比率のうち、ありえない値を既定値に戻しました（{string.Join("、", bad)}）");
+
+        double Pick(string name, double v, double fallback) => bad.Any(b => b.StartsWith(name + " ")) ? fallback : v;
+        return new BodyProportions(
+            ShoulderWidth: Pick("肩幅", measured.ShoulderWidth, d.ShoulderWidth),
+            HipWidth: Pick("腰幅", measured.HipWidth, d.HipWidth),
+            Torso: Pick("胴", measured.Torso, d.Torso),
+            Thigh: Pick("太もも", measured.Thigh, d.Thigh),
+            Shin: Pick("すね", measured.Shin, d.Shin),
+            Foot: Pick("足", measured.Foot, d.Foot),
+            NeckToEars: Pick("首〜耳", measured.NeckToEars, d.NeckToEars));
     }
 
     /// <summary>向き from を向き to に重ねる最小の回転。</summary>

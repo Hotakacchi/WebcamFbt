@@ -13,11 +13,20 @@ namespace WebcamFbt.Core.Tracking;
 /// カメラの傾き（ピッチ・ロール）の補正。まっすぐ立った体の縦の向きを真上に重ねる回転で、空間全体にかける。
 /// ステレオでキャリブレーションしたときだけ求める（単眼では null）。
 /// </param>
+/// <param name="Camera">
+/// カメラの置き方（床からの高さと下向きの傾き）。単眼でキャリブレーションしたときに立ち姿から求める。
+/// あれば単眼の 3D 化は床の面を使い、座標は最初から床が Y0 になる（<paramref name="FloorY"/> は使わない）。
+/// </param>
+/// <param name="ShoulderRatioRef">キャリブレーションのときの正面での肩幅の見え方（単眼で体の向きを出す基準。1 = 比率どおり）。</param>
+/// <param name="Warnings">キャリブレーションのときに気づいた問題（測り直した比率・カメラの置き方など）。表示用。</param>
 public sealed record CalibrationData(
     BodyProportions Body,
     float FloorY,
     double YawOffsetDeg,
-    Quaternion? Tilt = null)
+    Quaternion? Tilt = null,
+    CameraPose? Camera = null,
+    double? ShoulderRatioRef = null,
+    IReadOnlyList<string>? Warnings = null)
 {
     /// <summary>未キャリブレーション（既定の比率を使い、床・向き・傾きの補正はしない）。</summary>
     public static CalibrationData None { get; } = new(BodyProportions.Default, float.NaN, 0);
@@ -26,7 +35,8 @@ public sealed record CalibrationData(
     public bool HasFloor => !float.IsNaN(FloorY);
 
     /// <summary>既定値のまま（キャリブレーションしていない）か。</summary>
-    public bool IsCalibrated => !ReferenceEquals(Body, BodyProportions.Default) || HasFloor || YawOffsetDeg != 0 || Tilt is not null;
+    public bool IsCalibrated =>
+        !ReferenceEquals(Body, BodyProportions.Default) || HasFloor || YawOffsetDeg != 0 || Tilt is not null || Camera is not null;
 
     /// <summary>傾きの補正の大きさ [度]（補正なしなら 0）。</summary>
     public double TiltDeg => Tilt is { } q ? 2 * System.Math.Acos(System.Math.Min(1, System.Math.Abs(q.W))) * 180.0 / System.Math.PI : 0;

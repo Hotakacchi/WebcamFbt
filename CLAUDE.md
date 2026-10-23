@@ -103,6 +103,10 @@ UI は**Windows 版とできるだけ同じ見た目にする**（ユーザー�
 - 単眼 3D 化（`MonocularLifter`）: 骨長（身長×比率）と画像上の長さの比で距離、肩幅の縮みと鼻の位置で体のヨー、
   太もも・足の甲の縮みで膝・つま先の前後。背面や足を後ろに引く動きは原理的に不正確（フェーズ4で改善）
 - オイラー変換（`Rotation.ToUnityEuler`）は Python で 1 万ケース検算済み
+- 床の面を使う単眼 3D 化（後から追加・ユーザー確認済み）: 単眼の体のキャリブレーションで、立ち姿の 2D からカメラの高さ・下向きの傾きを
+  求め（`CameraPoseEstimator`）、`MonoCalibration` で床の面を使って測り直す（ありえない比率は既定値に戻して注意を出す）。
+  以後は `CalibrationData.Camera` があれば `MonocularLifter.LiftOnFloor`（床に着いた足＝視線と床の交点、ほかの関節はその奥行きの面、
+  座標は床が Y0）。向きは 20° の不感帯・鼻のずれのヒステリシス・平滑化。写り方の注意は `TrackingProcessor.SetupWarnings`
 
 ## 設計の要点（フェーズ3）
 

@@ -74,6 +74,14 @@ public sealed class TrackingProcessor
     }
     private volatile StereoStats? _lastStereoStats;
 
+    /// <summary>
+    /// 単眼のときの、写り方についての注意（足が画面の下端に近い・体が端に寄っている など）。問題なければ空。
+    /// 一瞬だけの状態で表示がちらつかないよう、しばらく続いたものだけを出す。
+    /// </summary>
+    public IReadOnlyList<string> SetupWarnings => _setupWarnings;
+    private volatile string[] _setupWarnings = [];
+    private readonly SetupMonitor _setupMonitor = new();
+
     // キャリブレーション中の状態。UI スレッドと推論スレッドから触るので volatile。
     private volatile Calibrator? _calibrator;
     private volatile int _calibrationTarget;
@@ -161,10 +169,15 @@ public sealed class TrackingProcessor
         var camera = calibrated
             ? intrinsics!.ToIntrinsics()
             : CameraIntrinsics.FromHorizontalFov(imageWidth, imageHeight, s.HorizontalFovDeg);
-        _toTracking.PitchDownDeg = s.CameraPitchDownDeg;
 
-        var pose3D = _lifter.Lift(points, layout, camera, _toTracking, s, Body, time);
-        var frame = pose3D is null ? null : Finish(pose3D, time, capturedTimestamp, stereo: false);
+        // 体のキャリブレーションでカメラの置き方が分かっていれば、その傾きで床の面を使う（傾きの設定は使わない）
+        var cal = Calibration;
+        _toTracking.PitchDownDeg = cal.Camera?.PitchDownDeg ?? s.CameraPitchDownDeg;
+        _setupWarnings = _setupMonitor.Update(points, layout, imageWidth, imageHeight);
+
+        var pose3D = _lifter.Lift(points, layout, camera, _toTracking, s, Body, time,
+            floor: cal.Camera, shoulderRatioRef: cal.ShoulderRatioRef ?? 1.0);
+        var frame = pose3D is null ? null : Finish(pose3D, time, capturedTimestamp, stereo: false, mono: (points, layout, camera));
         _sampler?.Invoke(new TrackingSample(false, capturedTimestamp, imageWidth, imageHeight, input, 0, 0, 0, null, pose3D, frame));
         return frame;
     }
@@ -225,7 +238,9 @@ public sealed class TrackingProcessor
     /// 3D の姿勢からトラッカーを求める（単眼・ステレオ共通の後段）。
     /// 体のキャリブレーション中ならこの姿勢を取り込み、床の高さ・向き・傾きの補正をかけて返す。
     /// </summary>
-    private TrackerFrame Finish(Pose3D pose3D, double time, long capturedTimestamp, bool stereo)
+    private TrackerFrame Finish(
+        Pose3D pose3D, double time, long capturedTimestamp, bool stereo,
+        (KeypointGate.GatedPoint[] Points, KeypointLayout Layout, CameraIntrinsics Camera)? mono = null)
     {
         var s = Settings;
 
@@ -233,10 +248,10 @@ public sealed class TrackingProcessor
         var cal = _calibrator;
         if (cal is not null)
         {
-            cal.Add(pose3D, stereo);
+            cal.Add(pose3D, stereo, mono);
             if (cal.FrameCount >= _calibrationTarget)
             {
-                var result = cal.Build(s.HeightMeters);
+                var result = BuildCalibration(cal, s);
                 _calibrator = null;
                 _calibrationActive = false;
                 if (result is not null)
@@ -244,6 +259,8 @@ public sealed class TrackingProcessor
                     Calibration = result;
                     Body = result.Body;
                     _calibrationSucceeded = true;
+                    // 座標の取り方が変わる（床の面を使う）ので、次のフレームで平滑化を捨てて前の位置を引きずらないようにする
+                    _resetRequested = true;
                 }
                 else
                 {
@@ -254,6 +271,27 @@ public sealed class TrackingProcessor
 
         var frame = _solver.Solve(pose3D, time, capturedTimestamp);
         return Calibration.Apply(frame);
+    }
+
+    /// <summary>
+    /// 貯めたフレームからキャリブレーション結果を作る。全フレームが単眼なら、立ち姿からカメラの置き方を求めて
+    /// 床の面を使って測り直す（<see cref="MonoCalibration"/>）。求まらなければ従来どおり 3D 姿勢から測る。
+    /// </summary>
+    private static CalibrationData? BuildCalibration(Calibrator cal, TrackingSettings s)
+    {
+        bool allMono = cal.Layout2D is not null && cal.Points2D.Count == cal.FrameCount;
+        if (!allMono) return cal.Build(s.HeightMeters);
+
+        var mono = MonoCalibration.Build(cal.Points2D, cal.Layout2D!, cal.Camera2D, s);
+        if (mono is not null) return mono;
+
+        var fallback = cal.Build(s.HeightMeters);
+        if (fallback is null) return null;
+        var warnings = new List<string>(fallback.Warnings ?? Array.Empty<string>())
+        {
+            "カメラの高さと傾きを求められませんでした（頭から足首まで全身が写るように、まっすぐ立ってやり直してください）",
+        };
+        return fallback with { Warnings = warnings };
     }
 
     /// <summary>キーポイントのレンズ歪みを補正した姿勢を作る。</summary>
@@ -295,5 +333,84 @@ public sealed class TrackingProcessor
         _gate2.Reset();
         _lifter.Reset();
         _solver.Reset();
+        _setupMonitor.Reset();
+        _setupWarnings = [];
+    }
+
+    /// <summary>
+    /// 写り方の注意を、フレームごとの判定をならして決める（推論スレッドだけで使う）。
+    /// 足首が画面の下端に近い・頭が上端に近い（全身が入っていない）、体が左右の端に寄っている（レンズの歪みが大きい）を見る。
+    /// </summary>
+    private sealed class SetupMonitor
+    {
+        private const double Smoothing = 0.05; // 1 フレームの重み（約 20 フレームでならす）
+        private const double On = 0.6, Off = 0.3; // 出す・消すしきい値（行ったり来たりしないよう差をつける）
+
+        private static readonly string[] Messages =
+        [
+            "足が画面の下端に近いです。カメラを少し離すか、上に向けて足元に余白を作ってください",
+            "頭が画面の上端に近いです。カメラを少し離すか、下に向けて頭の上に余白を作ってください",
+            "体が画面の端に寄っています。画面の中央に立つと、歪みが少なく安定します",
+        ];
+
+        private readonly double[] _level = new double[Messages.Length];
+        private readonly bool[] _shown = new bool[Messages.Length];
+
+        public string[] Update(KeypointGate.GatedPoint[] points, KeypointLayout layout, int width, int height)
+        {
+            float? MaxY(params Joint[] joints)
+            {
+                float? v = null;
+                foreach (var j in joints)
+                {
+                    int i = layout.IndexOf(j);
+                    if (i >= 0 && points[i].Valid && !points[i].Held) v = v is null ? points[i].Y : System.Math.Max(v.Value, points[i].Y);
+                }
+                return v;
+            }
+            float? MinY(params Joint[] joints)
+            {
+                float? v = null;
+                foreach (var j in joints)
+                {
+                    int i = layout.IndexOf(j);
+                    if (i >= 0 && points[i].Valid && !points[i].Held) v = v is null ? points[i].Y : System.Math.Min(v.Value, points[i].Y);
+                }
+                return v;
+            }
+            float? CenterX()
+            {
+                int l = layout.IndexOf(Joint.LeftHip), r = layout.IndexOf(Joint.RightHip);
+                if (l >= 0 && r >= 0 && points[l].Valid && points[r].Valid) return (points[l].X + points[r].X) * 0.5f;
+                return null;
+            }
+
+            // 人が見えていない・その部分が見えていないときは、判定を変えない
+            var feet = MaxY(Joint.LeftAnkle, Joint.RightAnkle, Joint.LeftHeel, Joint.RightHeel);
+            var head = MinY(Joint.HeadTop, Joint.LeftEar, Joint.RightEar, Joint.Nose);
+            var cx = CenterX();
+            bool?[] now =
+            [
+                feet is { } f ? f > 0.96 * height : null,
+                head is { } hd ? hd < 0.03 * height : null,
+                cx is { } x ? x < 0.2 * width || x > 0.8 * width : null,
+            ];
+
+            var result = new List<string>();
+            for (int i = 0; i < now.Length; i++)
+            {
+                if (now[i] is { } bad) _level[i] += Smoothing * ((bad ? 1 : 0) - _level[i]);
+                if (_level[i] > On) _shown[i] = true;
+                else if (_level[i] < Off) _shown[i] = false;
+                if (_shown[i]) result.Add(Messages[i]);
+            }
+            return [.. result];
+        }
+
+        public void Reset()
+        {
+            Array.Clear(_level);
+            Array.Clear(_shown);
+        }
     }
 }

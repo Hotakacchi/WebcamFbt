@@ -86,6 +86,21 @@ public sealed class BodyCalibrationSettings
     /// <summary>カメラの傾きの補正 (x, y, z, w)。ステレオで測ったときだけ。</summary>
     public float[]? Tilt { get; set; }
 
+    /// <summary>カメラの床からの高さ [m]（単眼で立ち姿から求めたとき）。</summary>
+    public double? CameraHeightMeters { get; set; }
+
+    /// <summary>カメラの下向きの傾き [度]（単眼で立ち姿から求めたとき）。</summary>
+    public double? CameraPitchDownDeg { get; set; }
+
+    /// <summary>立ち姿とのずれ [px]（カメラの置き方を求めたときの目安）。</summary>
+    public double? CameraFitErrorPx { get; set; }
+
+    /// <summary>正面での肩幅の見え方（単眼で体の向きを出す基準）。</summary>
+    public double? ShoulderRatioRef { get; set; }
+
+    /// <summary>キャリブレーションのときに気づいた問題（表示用）。</summary>
+    public string[]? Warnings { get; set; }
+
     public static BodyCalibrationSettings From(CalibrationData data)
     {
         var b = data.Body;
@@ -101,6 +116,11 @@ public sealed class BodyCalibrationSettings
             FloorY = data.HasFloor ? data.FloorY : null,
             YawOffsetDeg = data.YawOffsetDeg,
             Tilt = data.Tilt is { } q ? [q.X, q.Y, q.Z, q.W] : null,
+            CameraHeightMeters = data.Camera?.HeightMeters,
+            CameraPitchDownDeg = data.Camera?.PitchDownDeg,
+            CameraFitErrorPx = data.Camera?.FitErrorPx,
+            ShoulderRatioRef = data.ShoulderRatioRef,
+            Warnings = data.Warnings is { Count: > 0 } w ? [.. w] : null,
         };
     }
 
@@ -115,6 +135,10 @@ public sealed class BodyCalibrationSettings
 
         var body = new BodyProportions(ShoulderWidth, HipWidth, Torso, Thigh, Shin, Foot, NeckToEars);
         Quaternion? tilt = Tilt is { } t ? Quaternion.Normalize(new Quaternion(t[0], t[1], t[2], t[3])) : null;
-        return new CalibrationData(body, FloorY ?? float.NaN, YawOffsetDeg, tilt);
+        CameraPose? camera = CameraHeightMeters is { } ch && CameraPitchDownDeg is { } cp && double.IsFinite(ch) && ch > 0 && double.IsFinite(cp)
+            ? new CameraPose(ch, cp, CameraFitErrorPx ?? 0)
+            : null;
+        double? shoulderRef = ShoulderRatioRef is { } r && double.IsFinite(r) && r > 0 ? r : null;
+        return new CalibrationData(body, FloorY ?? float.NaN, YawOffsetDeg, tilt, camera, shoulderRef, Warnings);
     }
 }
