@@ -1,5 +1,6 @@
 // Mac 版（WebcamFbt.Mac）からも同じファイルをコンパイルして共有している。WPF の型（System.Windows.*）を使わないこと。
 using System.Text;
+using System.Diagnostics;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using WebcamFbt.Core.Tracking;
@@ -55,6 +56,7 @@ public sealed partial class MainViewModel
 
     /// <summary>確定までに貯めるフレーム数（おおよそ 30fps で 3 秒前後）。</summary>
     private const int CalibrationFrames = 90;
+    private readonly CalibrationCountdown _calibrationCountdown = new();
 
     partial void OnHeightMetersChanged(double value) => _trackingSettings.HeightMeters = value;
     partial void OnHorizontalFovChanged(double value) => _trackingSettings.HorizontalFovDeg = value;
@@ -97,7 +99,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// キャリブレーションを開始する。カメラの方を向いて T ポーズで立った状態で押してもらう。
+    /// 5秒の準備時間の後に、キャリブレーションを開始する。
     /// 数秒ぶん観測を貯めて、体の比率・床の高さ・正面方向を確定する。
     /// </summary>
     [RelayCommand]
@@ -109,16 +111,19 @@ public sealed partial class MainViewModel
             Status = "先に「開始」を押してください";
             return;
         }
-        tracking.BeginCalibration(CalibrationFrames);
+        if (IsCalibrating) return;
+        _calibrationCountdown.Start(Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency);
         IsCalibrating = true;
-        Status = "キャリブレーション中… カメラの方を向いて T ポーズで立ってください";
+        CalibrationText = "キャリブレーション開始まで 5 秒";
+        Status = "5秒後にキャリブレーション開始。カメラの方を向いて T ポーズで立ってください";
     }
 
     /// <summary>キャリブレーション結果を破棄して既定値に戻す。</summary>
     [RelayCommand]
     private void ClearCalibration()
     {
-        _tracking?.ClearCalibration();
+        _calibrationCountdown.Cancel();
+        lock (_trackingLock) _tracking?.ClearCalibration();
         IsCalibrating = false;
         CalibrationText = DescribeBodyCalibration(CalibrationData.None);
         Status = "キャリブレーションを解除しました";
@@ -150,6 +155,9 @@ public sealed partial class MainViewModel
     /// <summary>パイプライン停止時に呼ぶ。</summary>
     private void StopTracking()
     {
+        _calibrationCountdown.Cancel();
+        lock (_trackingLock) _tracking?.CancelCalibration();
+        IsCalibrating = false;
         _osc.Stop();
         _stereoActive = false;
         _stereoMatcher.Reset();
@@ -185,6 +193,7 @@ public sealed partial class MainViewModel
         }
         var tracking = _tracking;
         if (tracking == null) return;
+
         TrackerFrame? frame;
         lock (_trackingLock) frame = tracking.Process(e.Pose, e.Layout, e.CapturedTimestamp, e.ImageWidth, e.ImageHeight);
         Publish(frame);
@@ -268,6 +277,17 @@ public sealed partial class MainViewModel
     {
         var tracking = _tracking;
         if (tracking == null) return;
+
+        if (_calibrationCountdown.Poll(Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency) is { } seconds)
+        {
+            if (seconds > 0)
+            {
+                CalibrationText = $"キャリブレーション開始まで {seconds} 秒";
+                return;
+            }
+            lock (_trackingLock) tracking.BeginCalibration(CalibrationFrames);
+            Status = "キャリブレーション中… カメラの方を向いて T ポーズで立ってください";
+        }
 
         if (tracking.TryTakeCalibrationResult(out bool success))
         {

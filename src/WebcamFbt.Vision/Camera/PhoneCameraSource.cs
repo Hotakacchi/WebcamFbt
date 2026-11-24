@@ -26,6 +26,9 @@ public sealed class PhoneCameraSource : ICameraSource
     private Task? _worker;
     private X509Certificate2? _root, _server;
     private long _frameId;
+    private readonly object _clientsLock = new();
+    private readonly HashSet<Task> _clients = [];
+    private readonly SemaphoreSlim _clientSlots = new(8);
 
     public LatestSlot<Frame> Frames { get; } = new();
     public RateCounter CaptureRate { get; } = new();
@@ -107,14 +110,32 @@ public sealed class PhoneCameraSource : ICameraSource
         {
             try
             {
-                using var client = await listener.AcceptTcpClientAsync(stop);
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stop);
-                timeout.CancelAfter(TimeSpan.FromSeconds(8));
-                await HandleClient(client, timeout.Token);
+                var client = await listener.AcceptTcpClientAsync(stop);
+                if (!_clientSlots.Wait(0)) { client.Dispose(); continue; }
+                var task = HandleConnection(client, stop);
+                lock (_clientsLock) _clients.Add(task);
+                _ = task.ContinueWith(t => { lock (_clientsLock) _clients.Remove(t); },
+                    CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             }
             catch (OperationCanceledException) when (stop.IsCancellationRequested) { break; }
+            catch (SocketException) when (stop.IsCancellationRequested) { break; }
+        }
+        Task[] clients;
+        lock (_clientsLock) clients = [.. _clients];
+        await Task.WhenAll(clients);
+    }
+
+    private async Task HandleConnection(TcpClient client, CancellationToken stop)
+    {
+        using (client)
+        using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(stop))
+        {
+            timeout.CancelAfter(TimeSpan.FromSeconds(8));
+            try { await HandleClient(client, timeout.Token); }
+            catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
             catch (Exception ex) when (ex is IOException or SocketException or AuthenticationException or OperationCanceledException) { Error?.Invoke($"スマホとの接続エラー: {ex.Message}"); }
             catch (Exception ex) { Error?.Invoke($"スマホカメラの受信エラー: {ex.Message}"); }
+            finally { _clientSlots.Release(); }
         }
     }
 
@@ -149,10 +170,20 @@ public sealed class PhoneCameraSource : ICameraSource
         }
         if (!headers.TryGetValue("X-Camera-Token", out var token) || token != _token)
         { await Respond(tls, 403, "text/plain", [], ct); return; }
-        if (!headers.TryGetValue("Content-Length", out var lengthText) || !int.TryParse(lengthText, out int length) || length <= 0 || length > MaxImageBytes)
-        { await Respond(tls, 413, "text/plain", [], ct); return; }
-        var data = new byte[length];
-        await tls.ReadExactlyAsync(data, ct);
+        byte[] data;
+        bool hasLength = headers.TryGetValue("Content-Length", out var lengthText);
+        bool hasEncoding = headers.TryGetValue("Transfer-Encoding", out var encoding);
+        if (hasEncoding && !hasLength && string.Equals(encoding, "chunked", StringComparison.OrdinalIgnoreCase))
+        {
+            data = await ReadChunked(tls, ct) ?? [];
+        }
+        else if (hasLength && !hasEncoding && int.TryParse(lengthText, out int length) && length > 0 && length <= MaxImageBytes)
+        {
+            data = new byte[length];
+            await tls.ReadExactlyAsync(data, ct);
+        }
+        else { await Respond(tls, 413, "text/plain", [], ct); return; }
+        if (data.Length == 0) { await Respond(tls, 400, "text/plain", [], ct); return; }
         long received = Stopwatch.GetTimestamp();
         if (!ValidJpegSize(data)) { await Respond(tls, 400, "text/plain", [], ct); return; }
         using var decoded = Cv2.ImDecode(data, ImreadModes.Color);
@@ -161,6 +192,35 @@ public sealed class PhoneCameraSource : ICameraSource
         Frames.Put(new Frame(decoded.Clone(), 1, Interlocked.Increment(ref _frameId), received));
         CaptureRate.Tick();
         await Respond(tls, 200, "text/plain", [], ct);
+    }
+
+    private static async Task<byte[]?> ReadChunked(Stream stream, CancellationToken ct)
+    {
+        using var result = new MemoryStream();
+        var one = new byte[1];
+        while (true)
+        {
+            var line = new List<byte>();
+            while (line.Count < 128)
+            {
+                if (await stream.ReadAsync(one, ct) == 0) return null;
+                line.Add(one[0]);
+                if (line.Count >= 2 && line[^2] == 13 && line[^1] == 10) break;
+            }
+            if (line.Count < 2 || line[^2] != 13 || line[^1] != 10) return null;
+            var sizeText = Encoding.ASCII.GetString(line.ToArray(), 0, line.Count - 2).Split(';')[0];
+            if (!int.TryParse(sizeText, System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out int size) || size < 0 || result.Length + size > MaxImageBytes) return null;
+            if (size == 0)
+            {
+                // クライアントはトレーラーを送らない。CRLF以外は受け付けない。
+                var end = new byte[2]; await stream.ReadExactlyAsync(end, ct);
+                return end[0] == 13 && end[1] == 10 ? result.ToArray() : null;
+            }
+            var chunk = new byte[size]; await stream.ReadExactlyAsync(chunk, ct);
+            await result.WriteAsync(chunk, ct);
+            var crlf = new byte[2]; await stream.ReadExactlyAsync(crlf, ct);
+            if (crlf[0] != 13 || crlf[1] != 10) return null;
+        }
     }
 
     // 展開前にJPEGのSOFを調べ、巨大な画像によるメモリ消費を防ぐ。
@@ -204,10 +264,10 @@ public sealed class PhoneCameraSource : ICameraSource
 <title>WebcamFbt スマホカメラ</title><style>body{font:16px system-ui;background:#102334;color:#fff;margin:1.4em}video{width:100%;max-width:720px;background:#000}button{font-size:1.1em;padding:.7em;margin:.5em 0}p{line-height:1.6}</style>
 <h1>スマホカメラ</h1><p>スマホを固定し、全身が入るようにしてください。撮影開始後はこの画面を開いたままにします。</p><video id="preview" autoplay playsinline muted></video><p><button id="start">カメラを開始</button> <button id="stop">停止</button></p><p id="status">待機中</p>
 <script>
-const token=location.hash.slice(1), v=document.querySelector('#preview'), status=document.querySelector('#status'); let stream=null, running=false;
-document.querySelector('#start').onclick=async()=>{if(running)return; try {if(!token)throw Error('PCに表示されたURLをもう一度開いてください'); stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:15}}});v.srcObject=stream;await v.play();running=true;status.textContent='送信中';send();}catch(e){status.textContent='開始できません: '+e.message;}};
-document.querySelector('#stop').onclick=()=>{running=false;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;status.textContent='停止中';};
-const canvas=document.createElement('canvas');async function send(){while(running){try{if(v.videoWidth){canvas.width=v.videoWidth;canvas.height=v.videoHeight;canvas.getContext('2d').drawImage(v,0,0);const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.7));const response=await fetch('/frame',{method:'POST',headers:{'X-Camera-Token':token,'Content-Type':'image/jpeg'},body:blob});if(!response.ok)throw Error('受信側のエラー '+response.status);}await new Promise(r=>setTimeout(r,60));}catch(e){status.textContent='送信が停止しました: '+e.message;running=false;if(stream)stream.getTracks().forEach(t=>t.stop());}}}
+const token=location.hash.slice(1), v=document.querySelector('#preview'), statusEl=document.querySelector('#status'); let stream=null, running=false, generation=0;
+document.querySelector('#start').onclick=async()=>{if(running)return; running=true;const id=++generation;try {if(!token)throw Error('PCに表示されたURLをもう一度開いてください'); statusEl.textContent='カメラを準備中';const next=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:15}}});if(id!==generation){next.getTracks().forEach(t=>t.stop());return;}stream=next;v.srcObject=stream;await v.play();if(id!==generation)return;statusEl.textContent='Mac / PCに画像を送信しています…';send(id);}catch(e){if(id!==generation)return;running=false;statusEl.textContent='開始できません: '+e.message;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;}};
+document.querySelector('#stop').onclick=()=>{running=false;generation++;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;statusEl.textContent='停止中';};
+const canvas=document.createElement('canvas');async function send(id){let count=0,waitingSince=Date.now();while(running&&id===generation){try{if(v.videoWidth&&v.videoHeight){const w=v.videoWidth,h=v.videoHeight,scale=Math.min(1,1280/Math.max(w,h),720/Math.min(w,h));canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));canvas.getContext('2d').drawImage(v,0,0,canvas.width,canvas.height);const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.7));if(!blob)throw Error('画像を作成できません');const abort=new AbortController(),timeout=setTimeout(()=>abort.abort(),8000);let response;try{response=await fetch('/frame',{method:'POST',headers:{'X-Camera-Token':token,'Content-Type':'image/jpeg'},body:blob,cache:'no-store',signal:abort.signal});}finally{clearTimeout(timeout);}if(!response.ok)throw Error('受信側のエラー '+response.status);if(id!==generation)return;count++;statusEl.textContent='送信中（受信確認 '+count+' 枚）';}else if(Date.now()-waitingSince>8000)throw Error('カメラ映像を取得できません');await new Promise(r=>setTimeout(r,60));}catch(e){if(id!==generation)return;statusEl.textContent='送信が停止しました: '+(e.name==='AbortError'?'受信側から応答がありません':e.message||e)+'。MacとiPhoneのWi-Fi・ファイアウォールを確認してください。';running=false;if(stream)stream.getTracks().forEach(t=>t.stop());}}}
 </script></html>
 """;
 

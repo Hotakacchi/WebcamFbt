@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using OpenCvSharp;
 using WebcamFbt.Vision.Camera;
@@ -29,6 +30,9 @@ public class PhoneCameraTests
             return chain.Build(certificate);
         };
         using var client = new HttpClient(handler) { BaseAddress = baseUri, Timeout = TimeSpan.FromSeconds(5) };
+        // Safariなどが先に接続だけ開いても、次のHTTPS通信を妨げない。
+        using var idle = new TcpClient();
+        await idle.ConnectAsync(IPAddress.Loopback, uri.Port);
         string page;
         try { page = await client.GetStringAsync("/"); }
         catch (HttpRequestException ex) { throw new Exception($"サーバー: {serverError}", ex); }
@@ -49,6 +53,12 @@ public class PhoneCameraTests
         Assert.Equal(48, frame!.Image.Width);
         Assert.Equal(32, frame.Image.Height);
         Assert.Equal(1, frame.CameraIndex);
+        using var chunked = new HttpRequestMessage(HttpMethod.Post, "/frame") { Content = new ByteArrayContent(jpeg) };
+        chunked.Headers.Add("X-Camera-Token", token);
+        chunked.Headers.TransferEncodingChunked = true;
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(chunked)).StatusCode);
+        using var chunkedFrame = camera.Frames.Take(TimeSpan.FromSeconds(1));
+        Assert.NotNull(chunkedFrame);
         camera.Stop();
         Assert.False(File.Exists(camera.CertificatePath));
         await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("/"));
