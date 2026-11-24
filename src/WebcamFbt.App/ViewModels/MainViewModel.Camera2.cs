@@ -64,6 +64,8 @@ public sealed partial class MainViewModel
                 throw new InvalidOperationException("受信アドレスにはPC自身のIPv4アドレスを指定してください。");
             var phone = new PhoneCameraSource(PhoneCameraPort, string.IsNullOrWhiteSpace(PhoneCameraAddress) ? null : System.Net.IPAddress.Parse(PhoneCameraAddress));
             phone.Error += msg => PostStatus(msg);
+            IProgress<PhoneCameraSource> changed = new Progress<PhoneCameraSource>(PhoneCameraChanged);
+            phone.CameraChanged += () => changed.Report(phone);
             camera = phone;
         }
         else
@@ -92,11 +94,16 @@ public sealed partial class MainViewModel
         }
         _pipeline2 = pipeline;
         if (camera is PhoneCameraSource phoneCamera)
+        {
+            _activePhoneCamera = phoneCamera;
             PhoneCameraInfo = $"スマホで開く: {phoneCamera.ConnectionUrl}\n証明書: {phoneCamera.CertificatePath}\nSHA-256: {phoneCamera.CertificateFingerprint}\n証明書をスマホに安全に転送して信頼設定してください。停止後は再設定が必要です。";
+        }
     }
 
     private void StopSecondCamera()
     {
+        _activePhoneCamera = null;
+        _phoneCameraGeneration++;
         _pipeline2?.Dispose();
         _pipeline2 = null;
         PreviewImage2 = null;
@@ -108,6 +115,7 @@ public sealed partial class MainViewModel
     {
         var preview = _pipeline2?.Preview.TryTake();
         if (preview == null) return;
+        if (CameraPrivacyEnabled) { preview.Dispose(); return; }
         using (preview)
         {
             var mat = preview.Image;

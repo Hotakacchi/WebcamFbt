@@ -184,6 +184,7 @@ public sealed partial class MainViewModel
         var spec = session.Spec;
         int device1 = SelectedCamera.Value;
         int device2 = SelectedCamera2.Value;
+        int phoneGeneration = _phoneCameraGeneration;
         try
         {
             if (c.IsStereo)
@@ -196,6 +197,11 @@ public sealed partial class MainViewModel
                     var cal2 = CameraCalibrationSolver.CalibrateMono(c.GetSamples(1), spec, w2, h2);
                     return CameraCalibrationSolver.CalibrateStereo(c.GetPairs(), cal1, cal2, spec, device1, device2);
                 });
+                if (phoneGeneration != _phoneCameraGeneration)
+                {
+                    Status = "スマホのカメラが変わったため校正を中止しました。もう一度校正してください";
+                    return;
+                }
                 // スマホは端末とカメラ位置を識別できないため、別の接続で古い校正を再利用しない。
                 if (!UsePhoneCamera) _calibrationStore.SaveStereo(stereo);
                 _stereoCalibration = stereo;

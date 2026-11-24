@@ -121,7 +121,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private bool _previewSuspended;
 
     /// <summary>実際にプレビューを作るか（設定がオンで、一時的に止めていないとき）。</summary>
-    private bool EffectivePreview => PreviewEnabled && !_previewSuspended;
+    private bool EffectivePreview => PreviewEnabled && !_previewSuspended && !CameraPrivacyEnabled;
 
     /// <summary>
     /// プレビューを一時的に止める・再開する（ウィンドウが見えなくなった・見えるようになったとき）。
@@ -283,6 +283,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         var preview = _pipeline?.Preview.TryTake();
         if (preview == null) return;
+        if (CameraPrivacyEnabled) { preview.Dispose(); return; }
         using (preview)
         {
             var mat = preview.Image;

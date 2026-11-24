@@ -26,6 +26,8 @@ public sealed class PhoneCameraSource : ICameraSource
     private Task? _worker;
     private X509Certificate2? _root, _server;
     private long _frameId;
+    private readonly object _facingLock = new();
+    private string? _lastFacing;
     private readonly object _clientsLock = new();
     private readonly HashSet<Task> _clients = [];
     private readonly SemaphoreSlim _clientSlots = new(8);
@@ -36,6 +38,8 @@ public sealed class PhoneCameraSource : ICameraSource
     public string CertificatePath { get; private set; } = "";
     public string CertificateFingerprint { get; private set; } = "";
     public event Action<string>? Error;
+    /// <summary>スマホ側で内外カメラを切り替えたとき、最初の新しいフレームの受信時に通知する。</summary>
+    public event Action? CameraChanged;
 
     public PhoneCameraSource(int port = 8765, IPAddress? bindAddress = null) { _port = port; _bindAddress = bindAddress; }
 
@@ -189,6 +193,12 @@ public sealed class PhoneCameraSource : ICameraSource
         using var decoded = Cv2.ImDecode(data, ImreadModes.Color);
         if (decoded.Empty() || decoded.Width > 1920 || decoded.Height > 1920 || (long)decoded.Width * decoded.Height > 1920 * 1080)
         { await Respond(tls, 400, "text/plain", [], ct); return; }
+        if (headers.TryGetValue("X-Camera-Facing", out var facing) && facing is "user" or "environment")
+        {
+            bool changed;
+            lock (_facingLock) { changed = _lastFacing != null && _lastFacing != facing; _lastFacing = facing; }
+            if (changed) CameraChanged?.Invoke();
+        }
         Frames.Put(new Frame(decoded.Clone(), 1, Interlocked.Increment(ref _frameId), received));
         CaptureRate.Tick();
         await Respond(tls, 200, "text/plain", [], ct);
@@ -262,12 +272,26 @@ public sealed class PhoneCameraSource : ICameraSource
     private const string Page = """
 <!doctype html><html lang="ja"><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="utf-8">
 <title>WebcamFbt スマホカメラ</title><style>body{font:16px system-ui;background:#102334;color:#fff;margin:1.4em}video{width:100%;max-width:720px;background:#000}button{font-size:1.1em;padding:.7em;margin:.5em 0}p{line-height:1.6}</style>
-<h1>スマホカメラ</h1><p>スマホを固定し、全身が入るようにしてください。撮影開始後はこの画面を開いたままにします。</p><video id="preview" autoplay playsinline muted></video><p><button id="start">カメラを開始</button> <button id="stop">停止</button></p><p id="status">待機中</p>
+<h1>スマホカメラ</h1><p>スマホを固定し、全身が入るようにしてください。撮影開始後はこの画面を開いたままにします。内外カメラを切り替えたら、PCでカメラと体の校正をやり直してください。</p><video id="preview" autoplay playsinline muted></video><p><button id="start">カメラを開始</button> <button id="switch">内カメラに切り替え</button> <button id="stop">停止</button></p><p id="status">待機中</p>
 <script>
-const token=location.hash.slice(1), v=document.querySelector('#preview'), statusEl=document.querySelector('#status'); let stream=null, running=false, generation=0;
-document.querySelector('#start').onclick=async()=>{if(running)return; running=true;const id=++generation;try {if(!token)throw Error('PCに表示されたURLをもう一度開いてください'); statusEl.textContent='カメラを準備中';const next=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:15}}});if(id!==generation){next.getTracks().forEach(t=>t.stop());return;}stream=next;v.srcObject=stream;await v.play();if(id!==generation)return;statusEl.textContent='Mac / PCに画像を送信しています…';send(id);}catch(e){if(id!==generation)return;running=false;statusEl.textContent='開始できません: '+e.message;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;}};
-document.querySelector('#stop').onclick=()=>{running=false;generation++;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;statusEl.textContent='停止中';};
-const canvas=document.createElement('canvas');async function send(id){let count=0,waitingSince=Date.now();while(running&&id===generation){try{if(v.videoWidth&&v.videoHeight){const w=v.videoWidth,h=v.videoHeight,scale=Math.min(1,1280/Math.max(w,h),720/Math.min(w,h));canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));canvas.getContext('2d').drawImage(v,0,0,canvas.width,canvas.height);const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.7));if(!blob)throw Error('画像を作成できません');const abort=new AbortController(),timeout=setTimeout(()=>abort.abort(),8000);let response;try{response=await fetch('/frame',{method:'POST',headers:{'X-Camera-Token':token,'Content-Type':'image/jpeg'},body:blob,cache:'no-store',signal:abort.signal});}finally{clearTimeout(timeout);}if(!response.ok)throw Error('受信側のエラー '+response.status);if(id!==generation)return;count++;statusEl.textContent='送信中（受信確認 '+count+' 枚）';}else if(Date.now()-waitingSince>8000)throw Error('カメラ映像を取得できません');await new Promise(r=>setTimeout(r,60));}catch(e){if(id!==generation)return;statusEl.textContent='送信が停止しました: '+(e.name==='AbortError'?'受信側から応答がありません':e.message||e)+'。MacとiPhoneのWi-Fi・ファイアウォールを確認してください。';running=false;if(stream)stream.getTracks().forEach(t=>t.stop());}}}
+const token=location.hash.slice(1), v=document.querySelector('#preview'), statusEl=document.querySelector('#status'), switchButton=document.querySelector('#switch');
+let stream=null, running=false, generation=0, facing='environment', activeAbort=null;
+function stopCamera(){running=false;generation++;if(activeAbort)activeAbort.abort();activeAbort=null;if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;v.srcObject=null;}
+async function startCamera(){
+ if(running)return;running=true;const id=++generation,selectedFacing=facing;
+ try{
+  if(!token)throw Error('PCに表示されたURLをもう一度開いてください');
+  statusEl.textContent=(facing==='user'?'内カメラ':'外カメラ')+'を準備中';
+  const next=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{exact:selectedFacing},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:15}}});
+  if(id!==generation){next.getTracks().forEach(t=>t.stop());return;}
+  stream=next;v.srcObject=stream;await v.play();if(id!==generation)return;
+  statusEl.textContent='Mac / PCに画像を送信しています…';send(id,selectedFacing);
+ }catch(e){if(id!==generation)return;stopCamera();statusEl.textContent='開始できません: '+(e.name==='OverconstrainedError'?'このカメラを利用できません':e.message||e);}
+}
+document.querySelector('#start').onclick=startCamera;
+document.querySelector('#stop').onclick=()=>{stopCamera();statusEl.textContent='停止中';};
+switchButton.onclick=()=>{const restart=running;stopCamera();facing=facing==='environment'?'user':'environment';switchButton.textContent=facing==='environment'?'内カメラに切り替え':'外カメラに切り替え';statusEl.textContent=(facing==='user'?'内カメラ':'外カメラ')+'を選択中';if(restart)startCamera();};
+const canvas=document.createElement('canvas');async function send(id,selectedFacing){let count=0,waitingSince=Date.now();while(running&&id===generation){try{if(v.videoWidth&&v.videoHeight){const w=v.videoWidth,h=v.videoHeight,scale=Math.min(1,1280/Math.max(w,h),720/Math.min(w,h));canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));canvas.getContext('2d').drawImage(v,0,0,canvas.width,canvas.height);const blob=await new Promise(r=>canvas.toBlob(r,'image/jpeg',.7));if(id!==generation)return;if(!blob)throw Error('画像を作成できません');const abort=new AbortController(),timeout=setTimeout(()=>abort.abort(),8000);activeAbort=abort;let response;try{response=await fetch('/frame',{method:'POST',headers:{'X-Camera-Token':token,'X-Camera-Facing':selectedFacing,'Content-Type':'image/jpeg'},body:blob,cache:'no-store',signal:abort.signal});}finally{clearTimeout(timeout);if(activeAbort===abort)activeAbort=null;}if(!response.ok)throw Error('受信側のエラー '+response.status);if(id!==generation)return;count++;statusEl.textContent='送信中（受信確認 '+count+' 枚）';}else if(Date.now()-waitingSince>8000)throw Error('カメラ映像を取得できません');await new Promise(r=>setTimeout(r,60));}catch(e){if(id!==generation)return;stopCamera();statusEl.textContent='送信が停止しました: '+(e.name==='AbortError'?'受信側から応答がありません':e.message||e)+'。MacとiPhoneのWi-Fi・ファイアウォールを確認してください。';}}}
 </script></html>
 """;
 
@@ -280,6 +304,7 @@ const canvas=document.createElement('canvas');async function send(id){let count=
         _stop?.Dispose(); _stop = null;
         _server?.Dispose(); _server = null;
         _root?.Dispose(); _root = null;
+        lock (_facingLock) _lastFacing = null;
         if (CertificatePath.Length > 0) { try { File.Delete(CertificatePath); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
         Frames.Clear(); CaptureRate.Reset();
     }

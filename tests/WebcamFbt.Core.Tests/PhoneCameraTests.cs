@@ -13,7 +13,9 @@ public class PhoneCameraTests
     {
         using var camera = new PhoneCameraSource(0, IPAddress.Loopback);
         string? serverError = null;
+        int changes = 0;
         camera.Error += message => serverError = message;
+        camera.CameraChanged += () => Interlocked.Increment(ref changes);
         camera.Start();
         var uri = new Uri(camera.ConnectionUrl);
         var token = uri.Fragment.TrimStart('#');
@@ -47,6 +49,7 @@ public class PhoneCameraTests
         Assert.Null(camera.Frames.TryTake());
         using var valid = new HttpRequestMessage(HttpMethod.Post, "/frame") { Content = new ByteArrayContent(jpeg) };
         valid.Headers.Add("X-Camera-Token", token);
+        valid.Headers.Add("X-Camera-Facing", "environment");
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(valid)).StatusCode);
         using var frame = camera.Frames.Take(TimeSpan.FromSeconds(1));
         Assert.NotNull(frame);
@@ -55,10 +58,12 @@ public class PhoneCameraTests
         Assert.Equal(1, frame.CameraIndex);
         using var chunked = new HttpRequestMessage(HttpMethod.Post, "/frame") { Content = new ByteArrayContent(jpeg) };
         chunked.Headers.Add("X-Camera-Token", token);
+        chunked.Headers.Add("X-Camera-Facing", "user");
         chunked.Headers.TransferEncodingChunked = true;
         Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(chunked)).StatusCode);
         using var chunkedFrame = camera.Frames.Take(TimeSpan.FromSeconds(1));
         Assert.NotNull(chunkedFrame);
+        Assert.Equal(1, changes);
         camera.Stop();
         Assert.False(File.Exists(camera.CertificatePath));
         await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("/"));
