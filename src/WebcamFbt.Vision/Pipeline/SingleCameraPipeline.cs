@@ -23,7 +23,7 @@ public readonly record struct PoseEstimatedEventArgs(
 /// </summary>
 public sealed class SingleCameraPipeline : IDisposable
 {
-    private readonly OpenCvCameraSource _camera;
+    private readonly ICameraSource _camera;
     private readonly IPoseEstimator2D _estimator;
     private Thread? _thread;
     private volatile bool _running;
@@ -65,7 +65,7 @@ public sealed class SingleCameraPipeline : IDisposable
     /// <summary>推論スレッドで起きたエラー。</summary>
     public event Action<string>? Error;
 
-    public SingleCameraPipeline(OpenCvCameraSource camera, IPoseEstimator2D estimator)
+    public SingleCameraPipeline(ICameraSource camera, IPoseEstimator2D estimator)
     {
         _camera = camera;
         _estimator = estimator;

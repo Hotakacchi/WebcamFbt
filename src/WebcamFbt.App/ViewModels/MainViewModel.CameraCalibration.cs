@@ -125,7 +125,7 @@ public sealed partial class MainViewModel
     private void LoadCameraCalibration(int device1, int width, int height)
     {
         _camera1Calibration = _calibrationStore.GetCamera(device1, width, height);
-        _stereoCalibration = _pipeline2 != null ? _calibrationStore.GetStereo(device1, SelectedCamera2.Value) : null;
+        _stereoCalibration = _pipeline2 != null && !UsePhoneCamera ? _calibrationStore.GetStereo(device1, SelectedCamera2.Value) : null;
         if (_tracking != null) _tracking.Intrinsics = _camera1Calibration;
         UpdateTrackingMode();
         CameraCalibrationText = DescribeCameraCalibration();
@@ -196,7 +196,8 @@ public sealed partial class MainViewModel
                     var cal2 = CameraCalibrationSolver.CalibrateMono(c.GetSamples(1), spec, w2, h2);
                     return CameraCalibrationSolver.CalibrateStereo(c.GetPairs(), cal1, cal2, spec, device1, device2);
                 });
-                _calibrationStore.SaveStereo(stereo);
+                // スマホは端末とカメラ位置を識別できないため、別の接続で古い校正を再利用しない。
+                if (!UsePhoneCamera) _calibrationStore.SaveStereo(stereo);
                 _stereoCalibration = stereo;
                 ApplyCamera1Calibration(stereo.Camera1);
                 UpdateTrackingMode();

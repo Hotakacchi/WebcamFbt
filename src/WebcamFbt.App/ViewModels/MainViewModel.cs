@@ -219,7 +219,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 try
                 {
                     await StartSecondCameraAsync(device, progress, _startCts.Token);
-                    Status = $"実行中（2 台: カメラ {settings.DeviceIndex} + {SelectedCamera2.Value}）";
+                    Status = UsePhoneCamera ? "実行中（カメラ1 + スマホカメラ）" : $"実行中（2 台: カメラ {settings.DeviceIndex} + {SelectedCamera2.Value}）";
                 }
                 catch (OperationCanceledException)
                 {

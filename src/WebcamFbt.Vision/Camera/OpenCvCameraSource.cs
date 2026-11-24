@@ -9,7 +9,7 @@ namespace WebcamFbt.Vision.Camera;
 /// OpenCV の VideoCapture でカメラ映像を取得する。
 /// 専用スレッドで読み続け、最新のフレームだけを <see cref="Frames"/> に置く（古いフレームは捨てる）。
 /// </summary>
-public sealed class OpenCvCameraSource : IDisposable
+public sealed class OpenCvCameraSource : ICameraSource
 {
     private readonly CameraSettings _settings;
     private readonly int _cameraIndex;

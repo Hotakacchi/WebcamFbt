@@ -87,7 +87,7 @@ public sealed partial class MainViewModel
             ? _camera1Calibration != null && (_pipeline2 == null || _stereoCalibration != null)
             // 開始前は、選んでいるカメラと解像度の校正が保存されているかで判断する
             : _calibrationStore.GetCamera(SelectedCamera.Value, SelectedResolution.Value.W, SelectedResolution.Value.H) != null
-              && (!TwoCameraMode || _calibrationStore.GetStereo(SelectedCamera.Value, SelectedCamera2.Value) != null);
+              && (!TwoCameraMode || (!UsePhoneCamera && _calibrationStore.GetStereo(SelectedCamera.Value, SelectedCamera2.Value) != null));
 
         bool[] done =
         [

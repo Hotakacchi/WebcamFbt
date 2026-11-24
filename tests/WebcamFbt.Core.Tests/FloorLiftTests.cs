@@ -165,6 +165,26 @@ public class FloorLiftTests
     }
 
     [Fact]
+    public void 接地の判定境界で足と腰の位置が飛ばない()
+    {
+        Pose3D Sample(float difference)
+        {
+            var ankle = new Vector3(0.07f * (float)Height,
+                (float)(CameraPoseEstimator.AnkleHeightRatio * Height), -2.0f - difference);
+            return Lift(new MonocularLifter(), Points(Body(2.0, rightAnkle: ankle), TruePose), TruePose, 0);
+        }
+
+        var before = Sample(0.149f);
+        var after = Sample(0.151f);
+        foreach (var joint in new[] { Joint.RightAnkle, Joint.RightHeel, Joint.RightBigToe, Joint.RightKnee, Joint.Pelvis })
+        {
+            Assert.True(before.TryGet(joint, out var a));
+            Assert.True(after.TryGet(joint, out var b));
+            Assert.True(Vector3.Distance(a, b) < 0.02f, $"{joint} が飛んだ: {Vector3.Distance(a, b):F3} m");
+        }
+    }
+
+    [Fact]
     public void 正面付近の小さな揺れでは向きが振れない()
     {
         var lifter = new MonocularLifter();

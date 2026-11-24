@@ -293,10 +293,16 @@
                             <CheckBox Content="カメラを2台使う（ステレオ）" IsChecked="{Binding TwoCameraMode}"
                                       Foreground="{StaticResource TextBrush}" Margin="0,10,0,0" />
                             <StackPanel Visibility="{Binding TwoCameraMode, Converter={StaticResource BoolToVisibility}}">
+                                <CheckBox Content="スマホをカメラ2として使う（ブラウザ）" IsChecked="{Binding UsePhoneCamera}" Foreground="{StaticResource TextBrush}" Margin="0,8,0,0" />
+                                <TextBlock Text="スマホ受信ポート" Style="{StaticResource Label}" />
+                                <TextBox Text="{Binding PhoneCameraPort, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="PCのIPv4（空欄なら自動）" Style="{StaticResource Label}" />
+                                <TextBox Text="{Binding PhoneCameraAddress, UpdateSourceTrigger=PropertyChanged}" />
                                 <TextBlock Text="カメラ2 デバイス（解像度・fps はカメラ1と同じ）" Style="{StaticResource Label}" />
                                 <ComboBox ItemsSource="{Binding CameraChoices}" SelectedItem="{Binding SelectedCamera2}" />
                             </StackPanel>
                         </StackPanel>
+                        <TextBox Text="{Binding PhoneCameraInfo}" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" Margin="0,6,0,0" Visibility="{Binding UsePhoneCamera, Converter={StaticResource BoolToVisibility}}" />
 
                         <TextBlock Text="推論" Style="{StaticResource SectionHeader}" />
                         <StackPanel IsEnabled="{Binding CanEditSettings}">

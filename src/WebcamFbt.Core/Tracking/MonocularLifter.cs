@@ -36,8 +36,9 @@ public sealed class MonocularLifter
     /// <summary>鼻が肩の中心から肩幅のこの割合以上ずれたときだけ、向きの左右を切り替える。</summary>
     private const double YawSignSwitch = 0.12;
 
-    /// <summary>両足の床の上の位置がこれ [m] より近ければ、両足とも床に着いているとみなす。</summary>
-    private const double BothFeetPlantedTolerance = 0.15;
+    // 接地の判定境界で位置が急に切り替わらないよう、前後差に応じて連続的に混ぜる。
+    private const double BothFeetPlantedDistance = 0.10;
+    private const double OneFootPlantedDistance = 0.20;
 
     /// <param name="floor">
     /// カメラの置き方（体のキャリブレーションで求めたもの）。あれば床の面を使って 3D 化する（座標は床の上の、カメラの真下が原点）。
@@ -194,7 +195,7 @@ public sealed class MonocularLifter
     /// 床の面を使った 3D 化（カメラの高さと傾きが分かっているとき）。座標は床の上の、カメラの真下が原点（Y=0 が床）。
     ///
     /// 1. 床に着いている足: 足首を、カメラからの視線と「床から足首の高さの面」の交点として求める。
-    ///    両足の交点のうちカメラに近い方が着いている足（上げた足は高いので、視線の先の床が遠くなる）。
+    ///    近い方を接地足とし、両足の差が小さい間は両足を接地した推定と滑らかに混ぜる。
     /// 2. 体の面: 着いている足の奥行きにある縦の面。ほかの関節は、視線とこの面（向きや膝の出ぶんだけ前後にずらす）の交点。
     ///    見下ろしの遠近がそのまま反映されるので、脚が縮んで見えても体が小さくならない。
     /// 3. 体の向き: 体の面の上での肩幅を、キャリブレーションのときの正面の肩幅と比べる。正面に近い小さな揺れは無視し、
@@ -264,20 +265,19 @@ public sealed class MonocularLifter
         // ---- 1. 床に着いている足と、体の面の奥行き ----
         Vector3? leftFloor = Get(Joint.LeftAnkle, out var la) ? AtHeight(la, CameraPoseEstimator.AnkleHeightRatio * h) : null;
         Vector3? rightFloor = Get(Joint.RightAnkle, out var ra) ? AtHeight(ra, CameraPoseEstimator.AnkleHeightRatio * h) : null;
-        bool leftPlanted = false, rightPlanted = false;
+        double leftPlanted = 0, rightPlanted = 0;
         double zRaw;
         if (leftFloor is { } lf && rightFloor is { } rf)
         {
-            if (System.Math.Abs(lf.Z - rf.Z) < BothFeetPlantedTolerance)
-            {
-                leftPlanted = rightPlanted = true;
-                zRaw = (lf.Z + rf.Z) * 0.5;
-            }
-            else if (lf.Z > rf.Z) { leftPlanted = true; zRaw = lf.Z; } // Z が大きい方がカメラに近い
-            else { rightPlanted = true; zRaw = rf.Z; }
+            double difference = System.Math.Abs(lf.Z - rf.Z);
+            double t = System.Math.Clamp((difference - BothFeetPlantedDistance) / (OneFootPlantedDistance - BothFeetPlantedDistance), 0, 1);
+            double otherWeight = 1 - t * t * (3 - 2 * t);
+            if (lf.Z >= rf.Z) { leftPlanted = 1; rightPlanted = otherWeight; }
+            else { rightPlanted = 1; leftPlanted = otherWeight; }
+            zRaw = (lf.Z * leftPlanted + rf.Z * rightPlanted) / (leftPlanted + rightPlanted);
         }
-        else if (leftFloor is { } onlyLeft) { leftPlanted = true; zRaw = onlyLeft.Z; }
-        else if (rightFloor is { } onlyRight) { rightPlanted = true; zRaw = onlyRight.Z; }
+        else if (leftFloor is { } onlyLeft) { leftPlanted = 1; zRaw = onlyLeft.Z; }
+        else if (rightFloor is { } onlyRight) { rightPlanted = 1; zRaw = onlyRight.Z; }
         else
         {
             // 足首が見えない: 骨の長さから距離を出し、骨盤（無ければ首）の奥行きを体の面にする
@@ -330,27 +330,9 @@ public sealed class MonocularLifter
         z[(int)Joint.LeftShoulder] = zPlane + halfShoulder * sinYaw;
         z[(int)Joint.RightShoulder] = zPlane - halfShoulder * sinYaw;
 
-        var onFloor = new Dictionary<Joint, Vector3>();
-        void Leg(Joint hip, Joint knee, Joint ankle, Joint heel, Joint bigToe, Joint smallToe, bool planted, Vector3? ankleOnFloor)
+        var onFloor = new Dictionary<Joint, (Vector3 Point, float Weight)>();
+        void Leg(Joint hip, Joint knee, Joint ankle, Joint heel, Joint bigToe, Joint smallToe, double planted, Vector3? ankleOnFloor)
         {
-            if (planted && ankleOnFloor is { } a)
-            {
-                // 床に着いている足: 足首・かかと・つま先は床の近くの面との交点。膝は股関節と足首の間の奥行き
-                onFloor[ankle] = a;
-                z[(int)knee] = (z[(int)hip] + a.Z) * 0.5;
-                foreach (var (j, ratio) in new[]
-                {
-                    (heel, CameraPoseEstimator.HeelHeightRatio),
-                    (bigToe, CameraPoseEstimator.ToeHeightRatio),
-                    (smallToe, CameraPoseEstimator.ToeHeightRatio),
-                })
-                {
-                    if (Get(j, out var pj) && AtHeight(pj, ratio * h) is { } q) onFloor[j] = q;
-                    else z[(int)j] = a.Z;
-                }
-                return;
-            }
-
             // 上げている足: 太ももが縮んで見える分だけ膝が前に出ているとみなし、足首・かかとは膝と同じ奥行きにする
             double kneeZ = z[(int)hip];
             if (Get(hip, out var ph) && Get(knee, out var pk))
@@ -370,6 +352,21 @@ public sealed class MonocularLifter
             }
             z[(int)bigToe] = toeZ;
             z[(int)smallToe] = toeZ;
+            if (planted > 0 && ankleOnFloor is { } a)
+            {
+                float weight = (float)planted;
+                onFloor[ankle] = (a, weight);
+                z[(int)knee] += planted * ((z[(int)hip] + a.Z) * 0.5 - kneeZ);
+                foreach (var (j, ratio) in new[]
+                {
+                    (heel, CameraPoseEstimator.HeelHeightRatio),
+                    (bigToe, CameraPoseEstimator.ToeHeightRatio),
+                    (smallToe, CameraPoseEstimator.ToeHeightRatio),
+                })
+                {
+                    if (Get(j, out var pj) && AtHeight(pj, ratio * h) is { } q) onFloor[j] = (q, weight);
+                }
+            }
         }
         Leg(Joint.LeftHip, Joint.LeftKnee, Joint.LeftAnkle, Joint.LeftHeel, Joint.LeftBigToe, Joint.LeftSmallToe, leftPlanted, leftFloor);
         Leg(Joint.RightHip, Joint.RightKnee, Joint.RightAnkle, Joint.RightHeel, Joint.RightBigToe, Joint.RightSmallToe, rightPlanted, rightFloor);
@@ -380,9 +377,10 @@ public sealed class MonocularLifter
         {
             if (!points[i].Valid) continue;
             var joint = layout.Joints[i];
+            var estimated = AtDepth(new Vector2(points[i].X, points[i].Y), z[(int)joint]);
             pose.Set(joint, onFloor.TryGetValue(joint, out var q)
-                ? q
-                : AtDepth(new Vector2(points[i].X, points[i].Y), z[(int)joint]));
+                ? Vector3.Lerp(estimated, q.Point, q.Weight)
+                : estimated);
         }
         return pose;
     }

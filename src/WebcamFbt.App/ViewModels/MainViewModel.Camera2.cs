@@ -34,7 +34,7 @@ public sealed partial class MainViewModel
         IProgress<(double Ratio, string Message)> progress,
         CancellationToken ct)
     {
-        if (SelectedCamera2.Value == SelectedCamera.Value)
+        if (!UsePhoneCamera && SelectedCamera2.Value == SelectedCamera.Value)
         {
             throw new InvalidOperationException("カメラ 1 と 2 には別のデバイスを選んでください。");
         }
@@ -56,8 +56,22 @@ public sealed partial class MainViewModel
             SelectedResolution.Value.H,
             SelectedFps.Value,
             SelectedBackend.Value);
-        var camera = new OpenCvCameraSource(settings, cameraIndex: 1);
-        camera.Error += msg => PostStatus(msg);
+        ICameraSource camera;
+        if (UsePhoneCamera)
+        {
+            if (PhoneCameraPort is < 1024 or > 65535) throw new InvalidOperationException("ポート番号は1024〜65535を指定してください。");
+            if (!string.IsNullOrWhiteSpace(PhoneCameraAddress) && (!System.Net.IPAddress.TryParse(PhoneCameraAddress, out var parsed) || parsed.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork))
+                throw new InvalidOperationException("受信アドレスにはPC自身のIPv4アドレスを指定してください。");
+            var phone = new PhoneCameraSource(PhoneCameraPort, string.IsNullOrWhiteSpace(PhoneCameraAddress) ? null : System.Net.IPAddress.Parse(PhoneCameraAddress));
+            phone.Error += msg => PostStatus(msg);
+            camera = phone;
+        }
+        else
+        {
+            var local = new OpenCvCameraSource(settings, cameraIndex: 1);
+            local.Error += msg => PostStatus(msg);
+            camera = local;
+        }
 
         var pipeline = new SingleCameraPipeline(camera, _estimator2)
         {
@@ -77,6 +91,8 @@ public sealed partial class MainViewModel
             throw;
         }
         _pipeline2 = pipeline;
+        if (camera is PhoneCameraSource phoneCamera)
+            PhoneCameraInfo = $"スマホで開く: {phoneCamera.ConnectionUrl}\n証明書: {phoneCamera.CertificatePath}\nSHA-256: {phoneCamera.CertificateFingerprint}\n証明書をスマホに安全に転送して信頼設定してください。停止後は再設定が必要です。";
     }
 
     private void StopSecondCamera()
@@ -85,6 +101,7 @@ public sealed partial class MainViewModel
         _pipeline2 = null;
         PreviewImage2 = null;
         StatsText2 = "";
+        PhoneCameraInfo = "スマホカメラを選んで開始すると接続先を表示します。";
     }
 
     private void UpdatePreview2()
